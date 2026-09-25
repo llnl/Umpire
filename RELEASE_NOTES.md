@@ -1,3 +1,9 @@
+# v2026.07.1
+
+## Changes Impacting Builds
+
+- Resolved errors related to exporting the legacy umpire CMake target.
+
 # v2026.07.0
 
 ## Improvements
