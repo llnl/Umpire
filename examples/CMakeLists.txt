@@ -68,10 +68,18 @@ if (UMPIRE_ENABLE_HIP)
 endif()
 
 blt_add_executable(
-  NAME get_parent 
+  NAME get_parent
   SOURCES get_parent.cpp
   DEPENDS_ON ${example_depends})
 list(APPEND umpire_examples get_parent)
+
+if (UMPIRE_ENABLE_INTROSPECTION_HEADER)
+  blt_add_executable(
+    NAME introspection_header
+    SOURCES introspection_header.cpp
+    DEPENDS_ON ${example_depends})
+  list(APPEND umpire_examples introspection_header)
+endif()
 
 blt_add_executable(
   NAME strategy_example

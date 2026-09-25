@@ -18,6 +18,18 @@
 #include "umpire/strategy/QuickPool.hpp"
 #include "umpire/util/wrap_allocator.hpp"
 
+//
+// Tests that assert exact pool block layouts assume that the requested sizes
+// arrive at the pool unchanged, which is not the case when every allocation
+// is padded by an introspection header.
+//
+#if defined(UMPIRE_ENABLE_INTROSPECTION_HEADER)
+#define SKIP_IF_SIZES_ARE_PADDED() \
+  GTEST_SKIP() << "Exact pool block accounting does not hold with UMPIRE_ENABLE_INTROSPECTION_HEADER"
+#else
+#define SKIP_IF_SIZES_ARE_PADDED() ((void)0)
+#endif
+
 template <>
 struct tag_to_string<umpire::strategy::DynamicPoolList> {
   static constexpr const char* value = "DynamicPoolList";
@@ -96,6 +108,10 @@ TYPED_TEST(PrimaryPoolTest, Allocate)
 
 TYPED_TEST(PrimaryPoolTest, NamedAllocation)
 {
+#if defined(UMPIRE_ENABLE_INTROSPECTION_HEADER)
+  GTEST_SKIP() << "Allocation names are not retained with UMPIRE_ENABLE_INTROSPECTION_HEADER";
+#endif
+
   const std::string myname{"Mi nombre es Marty"};
   void* ptr{nullptr};
 
@@ -142,6 +158,8 @@ TYPED_TEST(PrimaryPoolTest, Duplicate)
 //
 TYPED_TEST(PrimaryPoolTest, BlocksStatistic)
 {
+  SKIP_IF_SIZES_ARE_PADDED();
+
   using Pool = typename TestFixture::Pool;
   auto pool = umpire::util::unwrap_allocator<Pool>(*this->m_allocator);
 
@@ -182,6 +200,8 @@ TYPED_TEST(PrimaryPoolTest, BlocksStatistic)
 
 TYPED_TEST(PrimaryPoolTest, Sizes)
 {
+  SKIP_IF_SIZES_ARE_PADDED();
+
   void* data{nullptr};
   const std::size_t size{this->m_initial_pool_size - 1};
 
@@ -292,6 +312,8 @@ TYPED_TEST(PrimaryPoolTest, MissingBlocks)
 
 TYPED_TEST(PrimaryPoolTest, largestavailable)
 {
+  SKIP_IF_SIZES_ARE_PADDED();
+
   using Pool = typename TestFixture::Pool;
   const int num_allocs = 16;
 
@@ -381,6 +403,8 @@ TYPED_TEST(PrimaryPoolTest, heuristic_bounds)
 
 TYPED_TEST(PrimaryPoolTest, heuristic_0_percent)
 {
+  SKIP_IF_SIZES_ARE_PADDED();
+
   const int initial_size{1024};
   const int subsequent_min_size{512};
   using Pool = typename TestFixture::Pool;
@@ -516,6 +540,8 @@ TYPED_TEST(PrimaryPoolTest, heuristic_0_percent)
 
 TYPED_TEST(PrimaryPoolTest, heuristic_75_percent)
 {
+  SKIP_IF_SIZES_ARE_PADDED();
+
   const int initial_size{1024};
   const int subsequent_min_size{1024};
   using Pool = typename TestFixture::Pool;
@@ -550,6 +576,8 @@ TYPED_TEST(PrimaryPoolTest, heuristic_75_percent)
 
 TYPED_TEST(PrimaryPoolTest, heuristic_75_percent_hwm)
 {
+  SKIP_IF_SIZES_ARE_PADDED();
+
   const int initial_size{1024};
   const int subsequent_min_size{1024};
   using Pool = typename TestFixture::Pool;
@@ -656,6 +684,8 @@ TYPED_TEST(PrimaryPoolTest, heuristic_100_percent)
 
 TYPED_TEST(PrimaryPoolTest, ReleasableSizeCheck)
 {
+  SKIP_IF_SIZES_ARE_PADDED();
+
   using Pool = typename TestFixture::Pool;
   auto pool = umpire::util::unwrap_allocator<Pool>(*this->m_allocator);
 

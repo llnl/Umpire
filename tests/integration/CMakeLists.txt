@@ -234,14 +234,30 @@ blt_add_test(
   NAME static_initialization_test
   COMMAND static_initialization_test)
 
-blt_add_executable(
-  NAME introspection_tests
-  SOURCES introspection_tests.cpp
-  DEPENDS_ON ${integration_tests_depends})
+if (UMPIRE_ENABLE_INTROSPECTION_HEADER)
+  blt_add_executable(
+    NAME introspection_header_tests
+    SOURCES introspection_header_tests.cpp
+    DEPENDS_ON ${integration_tests_depends})
 
-blt_add_test(
-  NAME introspection_tests
-  COMMAND introspection_tests)
+  target_include_directories(
+    introspection_header_tests
+    PRIVATE
+    ${PROJECT_BINARY_DIR}/include)
+
+  blt_add_test(
+    NAME introspection_header_tests
+    COMMAND introspection_header_tests)
+else ()
+  blt_add_executable(
+    NAME introspection_tests
+    SOURCES introspection_tests.cpp
+    DEPENDS_ON ${integration_tests_depends})
+
+  blt_add_test(
+    NAME introspection_tests
+    COMMAND introspection_tests)
+endif ()
 
 blt_add_executable(
   NAME destroy_allocator_tests

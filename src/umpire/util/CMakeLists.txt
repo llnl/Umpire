@@ -8,6 +8,7 @@
 set(UMPIRE_ENABLE_SYCL ${UMPIRE_ENABLE_SYCL})
 
 set (umpire_util_headers
+  AllocationHeader.hpp
   AllocationMap.hpp
   AllocationRecord.hpp
   affinity.hpp

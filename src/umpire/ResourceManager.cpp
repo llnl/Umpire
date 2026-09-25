@@ -21,6 +21,7 @@
 #if defined(UMPIRE_ENABLE_NUMA)
 #include "umpire/strategy/NumaPolicy.hpp"
 #endif
+#include "umpire/util/AllocationHeader.hpp"
 #include "umpire/util/MPI.hpp"
 #include "umpire/util/Macros.hpp"
 #include "umpire/util/io.hpp"
@@ -390,16 +391,23 @@ void ResourceManager::destroyAllocator(const std::string& name, bool free_alloca
                  fmt::format("Cannot destroy builtin allocator \"{}\"", name));
   }
 
+#if defined(UMPIRE_ENABLE_INTROSPECTION_HEADER)
+  // Allocation headers cannot be enumerated, but the strategy counters can
+  // still detect active allocations
+  const std::size_t num_allocations{strategy->getAllocationCount()};
+#else
   auto records = umpire::get_allocator_records(Allocator(strategy));
+  const std::size_t num_allocations{records.size()};
+#endif
 
   if (isStrictDestructionMode()) {
-    if (!records.empty() && !free_allocations) {
+    if (num_allocations != 0 && !free_allocations) {
       UMPIRE_ERROR(runtime_error,
                    fmt::format("Allocator \"{}\" has {} active allocations. "
                               "Use free_allocations=true or deallocate them first.",
-                              name, records.size()));
+                              name, num_allocations));
     }
-  } else if (!free_allocations && !records.empty()) {
+  } else if (!free_allocations && num_allocations != 0) {
     UMPIRE_LOG(Warning, "Allocator \"" << name << "\" may have active allocations. "
                         << "Destroying anyway (non-strict mode).");
   }
@@ -430,6 +438,16 @@ void ResourceManager::destroyAllocator(const std::string& name, bool free_alloca
                         << "Destroying anyway (non-strict mode).");
   }
 
+#if defined(UMPIRE_ENABLE_INTROSPECTION_HEADER)
+  if (free_allocations && num_allocations != 0) {
+    UMPIRE_ERROR(runtime_error,
+                 fmt::format("Cannot free the {} active allocations of allocator \"{}\": allocations cannot be "
+                             "enumerated with UMPIRE_ENABLE_INTROSPECTION_HEADER",
+                             num_allocations, name));
+  }
+  // Any remaining allocations are intentionally leaked; their headers are
+  // stored in the allocations themselves, so no dangling records remain
+#else
   if (free_allocations) {
     UMPIRE_LOG(Debug, "Freeing " << records.size() << " allocations");
     Allocator allocator{strategy};
@@ -449,6 +467,7 @@ void ResourceManager::destroyAllocator(const std::string& name, bool free_alloca
       deregisterAllocation(record.ptr);
     }
   }
+#endif
 
   std::vector<std::string> names_to_remove;
   for (const auto& entry : m_allocators_by_name) {
@@ -531,8 +550,75 @@ bool ResourceManager::hasAllocator(void* ptr)
 {
   UMPIRE_LOG(Debug, "(ptr=" << ptr << ")");
 
+#if defined(UMPIRE_ENABLE_INTROSPECTION_HEADER)
+  if (static_cast<strategy::FixedPool*>(m_zero_byte_pool)->pointerIsFromPool(ptr)) {
+    return true;
+  }
+
+  auto header = util::get_allocation_header(ptr);
+  return (header->ptr == ptr && header->strategy != nullptr);
+#else
   return m_allocations.contains(ptr);
+#endif
 }
+
+#if defined(UMPIRE_ENABLE_INTROSPECTION_HEADER)
+
+void ResourceManager::registerAllocation(void* ptr, util::AllocationRecord record)
+{
+  UMPIRE_USE_VAR(record);
+  UMPIRE_ERROR(runtime_error,
+               fmt::format("Cannot register {}: registering external allocations is not supported with "
+                           "UMPIRE_ENABLE_INTROSPECTION_HEADER",
+                           ptr));
+}
+
+util::AllocationRecord ResourceManager::deregisterAllocation(void* ptr)
+{
+  UMPIRE_ERROR(runtime_error,
+               fmt::format("Cannot deregister {}: deregistering allocations is not supported with "
+                           "UMPIRE_ENABLE_INTROSPECTION_HEADER",
+                           ptr));
+  return util::AllocationRecord{};
+}
+
+util::AllocationRecord* ResourceManager::findAllocationRecordInternal(void* ptr) const
+{
+  //
+  // Records are reconstructed from allocation headers into a small
+  // thread-local ring so that callers holding several records at once (for
+  // example copy, with a source and a destination record) do not alias.
+  //
+  static thread_local util::AllocationRecord s_records[4];
+  static thread_local std::size_t s_next{0};
+
+  util::AllocationRecord* record{&s_records[s_next]};
+  s_next = (s_next + 1) % 4;
+
+  // No valid user pointer can live below the header itself
+  if (reinterpret_cast<uintptr_t>(ptr) < util::allocation_header_size) {
+    UMPIRE_ERROR(unknown_pointer_error, fmt::format("Allocation not mapped: {}", ptr));
+  }
+
+  if (static_cast<strategy::FixedPool*>(m_zero_byte_pool)->pointerIsFromPool(ptr)) {
+    *record = util::AllocationRecord{ptr, 0, m_zero_byte_pool};
+    return record;
+  }
+
+  auto header = util::get_allocation_header(ptr);
+
+  if (header->ptr != ptr) {
+    UMPIRE_ERROR(unknown_pointer_error,
+                 fmt::format("Allocation not mapped: {} (only base pointers can be looked up with "
+                             "UMPIRE_ENABLE_INTROSPECTION_HEADER)",
+                             ptr));
+  }
+
+  *record = util::AllocationRecord{ptr, header->size, header->strategy};
+  return record;
+}
+
+#else
 
 void ResourceManager::registerAllocation(void* ptr, util::AllocationRecord record)
 {
@@ -554,9 +640,18 @@ util::AllocationRecord ResourceManager::deregisterAllocation(void* ptr)
   return m_allocations.remove(ptr);
 }
 
+util::AllocationRecord* ResourceManager::findAllocationRecordInternal(void* ptr) const
+{
+  // The map owns mutable records; the const_cast keeps a single lookup path
+  // for the internal callers that pass records to memory operations.
+  return const_cast<util::AllocationRecord*>(m_allocations.find(ptr));
+}
+
+#endif // UMPIRE_ENABLE_INTROSPECTION_HEADER
+
 const util::AllocationRecord* ResourceManager::findAllocationRecord(void* ptr) const
 {
-  auto alloc_record = m_allocations.find(ptr);
+  auto alloc_record = findAllocationRecordInternal(ptr);
 
   if (!alloc_record->strategy) {
     UMPIRE_ERROR(runtime_error, fmt::format("Cannot find allocator for {}", ptr));
@@ -573,17 +668,24 @@ void ResourceManager::copy(void* dst_ptr, void* src_ptr, std::size_t size)
 
   auto& op_registry = op::MemoryOperationRegistry::getInstance();
 
-  auto src_alloc_record = m_allocations.find(src_ptr);
+  auto src_alloc_record = findAllocationRecordInternal(src_ptr);
   std::ptrdiff_t src_offset = static_cast<char*>(src_ptr) - static_cast<char*>(src_alloc_record->ptr);
   std::size_t src_size = src_alloc_record->size - src_offset;
 
-  auto dst_alloc_record = m_allocations.find(dst_ptr);
+  auto dst_alloc_record = findAllocationRecordInternal(dst_ptr);
   std::ptrdiff_t dst_offset = static_cast<char*>(dst_ptr) - static_cast<char*>(dst_alloc_record->ptr);
   std::size_t dst_size = dst_alloc_record->size - dst_offset;
 
   if (size == 0) {
     size = src_size;
   }
+
+#if defined(UMPIRE_ENABLE_INTROSPECTION_HEADER)
+  // A zero-sized copy is a no-op
+  if (size == 0) {
+    return;
+  }
+#endif
 
   umpire::event::record([&](auto& event) {
     event.name("copy")
@@ -618,17 +720,24 @@ camp::resources::EventProxy<camp::resources::Resource> ResourceManager::copy(voi
 
   auto& op_registry = op::MemoryOperationRegistry::getInstance();
 
-  auto src_alloc_record = m_allocations.find(src_ptr);
+  auto src_alloc_record = findAllocationRecordInternal(src_ptr);
   std::ptrdiff_t src_offset = static_cast<char*>(src_ptr) - static_cast<char*>(src_alloc_record->ptr);
   std::size_t src_size = src_alloc_record->size - src_offset;
 
-  auto dst_alloc_record = m_allocations.find(dst_ptr);
+  auto dst_alloc_record = findAllocationRecordInternal(dst_ptr);
   std::ptrdiff_t dst_offset = static_cast<char*>(dst_ptr) - static_cast<char*>(dst_alloc_record->ptr);
   std::size_t dst_size = dst_alloc_record->size - dst_offset;
 
   if (size == 0) {
     size = src_size;
   }
+
+#if defined(UMPIRE_ENABLE_INTROSPECTION_HEADER)
+  // A zero-sized copy is a no-op
+  if (size == 0) {
+    return camp::resources::EventProxy<camp::resources::Resource>{ctx};
+  }
+#endif
 
   umpire::event::record([&](auto& event) {
     event.name("copy")
@@ -661,7 +770,7 @@ void ResourceManager::memset(void* ptr, int value, std::size_t length)
 
   auto& op_registry = op::MemoryOperationRegistry::getInstance();
 
-  auto alloc_record = m_allocations.find(ptr);
+  auto alloc_record = findAllocationRecordInternal(ptr);
 
   std::ptrdiff_t offset = static_cast<char*>(ptr) - static_cast<char*>(alloc_record->ptr);
   std::size_t size = alloc_record->size - offset;
@@ -669,6 +778,13 @@ void ResourceManager::memset(void* ptr, int value, std::size_t length)
   if (length == 0) {
     length = size;
   }
+
+#if defined(UMPIRE_ENABLE_INTROSPECTION_HEADER)
+  // A zero-sized memset is a no-op
+  if (length == 0) {
+    return;
+  }
+#endif
 
   umpire::event::record([&](auto& event) {
     event.name("memset")
@@ -698,7 +814,7 @@ camp::resources::EventProxy<camp::resources::Resource> ResourceManager::memset(v
 
   auto& op_registry = op::MemoryOperationRegistry::getInstance();
 
-  auto alloc_record = m_allocations.find(ptr);
+  auto alloc_record = findAllocationRecordInternal(ptr);
 
   std::ptrdiff_t offset = static_cast<char*>(ptr) - static_cast<char*>(alloc_record->ptr);
   std::size_t size = alloc_record->size - offset;
@@ -706,6 +822,13 @@ camp::resources::EventProxy<camp::resources::Resource> ResourceManager::memset(v
   if (length == 0) {
     length = size;
   }
+
+#if defined(UMPIRE_ENABLE_INTROSPECTION_HEADER)
+  // A zero-sized memset is a no-op
+  if (length == 0) {
+    return camp::resources::EventProxy<camp::resources::Resource>{ctx};
+  }
+#endif
 
   umpire::event::record([&](auto& event) {
     event.name("memset")
@@ -733,7 +856,7 @@ void* ResourceManager::reallocate(void* current_ptr, std::size_t new_size)
   strategy::AllocationStrategy* strategy;
 
   if (current_ptr != nullptr) {
-    auto alloc_record = m_allocations.find(current_ptr);
+    auto alloc_record = findAllocationRecordInternal(current_ptr);
     strategy = alloc_record->strategy;
   } else {
     strategy = getDefaultAllocator().getAllocationStrategy();
@@ -767,7 +890,7 @@ void* ResourceManager::reallocate(void* current_ptr, std::size_t new_size, camp:
   strategy::AllocationStrategy* strategy;
 
   if (current_ptr != nullptr) {
-    auto alloc_record = m_allocations.find(current_ptr);
+    auto alloc_record = findAllocationRecordInternal(current_ptr);
     strategy = alloc_record->strategy;
   } else {
     strategy = getDefaultAllocator().getAllocationStrategy();
@@ -862,7 +985,7 @@ void* ResourceManager::reallocate_impl(void* current_ptr, std::size_t new_size, 
   if (current_ptr == nullptr) {
     new_ptr = allocator.allocate(new_size);
   } else {
-    auto alloc_record = m_allocations.find(current_ptr);
+    auto alloc_record = findAllocationRecordInternal(current_ptr);
     auto alloc = Allocator(alloc_record->strategy);
 
     if (alloc_record->strategy != allocator.getAllocationStrategy()) {
@@ -913,7 +1036,7 @@ void* ResourceManager::reallocate_impl(void* current_ptr, std::size_t new_size, 
   if (current_ptr == nullptr) {
     new_ptr = allocator.allocate(new_size);
   } else {
-    auto alloc_record = m_allocations.find(current_ptr);
+    auto alloc_record = findAllocationRecordInternal(current_ptr);
     auto alloc = Allocator(alloc_record->strategy);
 
     if (alloc_record->strategy != allocator.getAllocationStrategy()) {
@@ -954,7 +1077,7 @@ void* ResourceManager::move(void* ptr, Allocator allocator)
 {
   UMPIRE_LOG(Debug, "(src_ptr=" << ptr << ", allocator=" << allocator.getName() << ")");
 
-  auto alloc_record = m_allocations.find(ptr);
+  auto alloc_record = findAllocationRecordInternal(ptr);
 
   // short-circuit if ptr was allocated by 'allocator'
   if (alloc_record->strategy == allocator.getAllocationStrategy()) {
@@ -978,7 +1101,7 @@ void* ResourceManager::move(void* ptr, Allocator allocator)
     if (dynamic_cast<strategy::NumaPolicy*>(base_strategy)) {
       auto& op_registry = op::MemoryOperationRegistry::getInstance();
 
-      auto src_alloc_record = m_allocations.find(ptr);
+      auto src_alloc_record = findAllocationRecordInternal(ptr);
 
       const std::size_t size{src_alloc_record->size};
       util::AllocationRecord dst_alloc_record{nullptr, size, allocator.getAllocationStrategy()};
@@ -1032,7 +1155,7 @@ camp::resources::EventProxy<camp::resources::Resource> ResourceManager::prefetch
   UMPIRE_LOG(Debug, "(ptr=" << ptr << ", device=" << device << ")");
 
   auto& op_registry = op::MemoryOperationRegistry::getInstance();
-  auto alloc_record = m_allocations.find(ptr);
+  auto alloc_record = findAllocationRecordInternal(ptr);
 
   if (alloc_record->strategy->getTraits().resource != umpire::MemoryResourceTraits::resource_type::um) {
     UMPIRE_ERROR(runtime_error, "ResourceManager::prefetch only works on allocations from a UM resource.");
@@ -1055,14 +1178,19 @@ void ResourceManager::deallocate(void* ptr)
 
 std::size_t ResourceManager::getSize(void* ptr) const
 {
-  auto record = m_allocations.find(ptr);
+  auto record = findAllocationRecordInternal(ptr);
   UMPIRE_LOG(Debug, "(ptr=" << ptr << ") returning " << record->size);
   return record->size;
 }
 
 std::size_t ResourceManager::getInternalMemoryUsage() const
 {
+#if defined(UMPIRE_ENABLE_INTROSPECTION_HEADER)
+  // Introspection metadata lives in the allocations themselves
+  return 0;
+#else
   return m_allocations.internalMemoryUsage();
+#endif
 }
 
 strategy::AllocationStrategy* ResourceManager::findAllocatorForId(int id)
@@ -1079,7 +1207,7 @@ strategy::AllocationStrategy* ResourceManager::findAllocatorForId(int id)
 
 strategy::AllocationStrategy* ResourceManager::findAllocatorForPointer(void* ptr)
 {
-  auto allocation_record = m_allocations.find(ptr);
+  auto allocation_record = findAllocationRecordInternal(ptr);
 
   if (!allocation_record->strategy) {
     UMPIRE_ERROR(runtime_error, fmt::format("Cannot find allocator for pointer: {}", ptr));

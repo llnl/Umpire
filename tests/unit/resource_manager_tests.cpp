@@ -27,12 +27,19 @@ TEST(ResourceManager, findAllocationRecord)
 
   char* ptr = static_cast<char*>(alloc.allocate(size));
   const umpire::util::AllocationRecord* rec_begin = rm.findAllocationRecord(ptr);
+
+  ASSERT_EQ(ptr, rec_begin->ptr);
+
+#if defined(UMPIRE_ENABLE_INTROSPECTION_HEADER)
+  // Only base pointers can be looked up from an allocation header
+  ASSERT_THROW(rm.findAllocationRecord(ptr + offset), umpire::runtime_error);
+#else
   const umpire::util::AllocationRecord* rec_middle = rm.findAllocationRecord(ptr + offset);
   const umpire::util::AllocationRecord* rec_end = rm.findAllocationRecord(ptr + (size - 1));
 
-  ASSERT_EQ(ptr, rec_begin->ptr);
   ASSERT_EQ(ptr, rec_middle->ptr);
   ASSERT_EQ(ptr, rec_end->ptr);
+#endif
 
   ASSERT_THROW(rm.findAllocationRecord(ptr + size), umpire::runtime_error);
 

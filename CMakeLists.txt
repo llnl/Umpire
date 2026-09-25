@@ -166,6 +166,12 @@ if (UMPIRE_ENABLE_DOCS AND NOT ENABLE_DOXYGEN)
   please re-configure with ENABLE_DOXYGEN=ON")
 endif ()
 
+if (UMPIRE_ENABLE_INTROSPECTION_HEADER AND UMPIRE_ENABLE_BACKTRACE)
+  message(FATAL_ERROR "\
+  UMPIRE_ENABLE_INTROSPECTION_HEADER is incompatible with UMPIRE_ENABLE_BACKTRACE, \
+  please re-configure with one of them Off")
+endif ()
+
 if (Git_FOUND)
   blt_git_hashcode (HASHCODE umpire_sha1
                     RETURN_CODE rc
