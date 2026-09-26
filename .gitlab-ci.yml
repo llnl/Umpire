@@ -39,6 +39,8 @@ variables:
   GIT_SUBMODULE_DEPTH: 1
   GIT_SUBMODULE_UPDATE_FLAGS: --jobs 2
   GIT_SUBMODULE_PATHS: scripts/radiuss-spack-configs scripts/uberenv
+# Force export of timing reports by setting to "ON"
+  REPORT_TIMINGS: "OFF"
 
 # SHARED_CI CONFIGURATION
 # Required information about GitHub repository
@@ -61,7 +63,7 @@ stages:
   - prerequisites           # Required: machine availability checks
   - build-and-test          # Required: build and test jobs
   - multi-project           # Manual: trigger testing in dependent project (e.g., CHAI)
-  - radiuss-spack-testing   # TODO unused so far
+  - finalizing
 
 ###############################################################################
 # INCLUDES
@@ -232,6 +234,39 @@ tuolumne-build-and-test:
       - local: '.gitlab/custom-jobs.yml'
       - artifact: 'tuolumne-jobs.yml'
         job: 'generate-job-lists'
+
+# CI TIMING TRENDS
+# Collect the per-job section timings produced by build_and_test.sh across all
+# child pipelines, merge them into an accumulating history, and publish trend
+# charts to GitLab Pages. Runs only on the default branch (or when REPORT_TIMINGS
+# is "ON") so the published series tracks the mainline. The history.jsonl
+# artifact of the latest default-branch pipeline is reused as the persistent
+# store (relies on GitLab's "keep artifacts from the most recent successful
+# pipelines" setting).
+#
+# No `needs:` on purpose: this job relies on stage ordering. The build-and-test
+# trigger jobs inherit `trigger:strategy: depend` from the shared-CI
+# `.build-and-test` template, so the build-and-test stage completes only once all
+# child pipelines finish; this job, in the last stage, therefore runs after them.
+# (The per-job timings.json are fetched via the GitLab API, not via needs, so no
+# artifact dependency is required here.) `when: always` keeps it running -- and
+# charting partial data -- even when a child pipeline fails.
+pages:
+  stage: finalizing
+  tags: [shell, oslic]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $REPORT_TIMINGS == "ON"'
+      when: always
+    - when: never
+  script:
+    - python3 -m venv .venv
+    - .venv/bin/pip install --quiet matplotlib
+    - .venv/bin/python scripts/gitlab/collect_and_chart_timings.py
+  artifacts:
+    paths:
+      - public
+      - history.jsonl
+    expire_in: never
 
 # MULTI-PROJECT PIPELINE
 trigger-chai:
