@@ -9,6 +9,7 @@
 #include <cstdlib>
 
 #include "umpire/ResourceManager.hpp"
+#include "umpire/op.hpp"
 #include "umpire/strategy/AllocationStrategy.hpp"
 #include "umpire/util/AllocationRecord.hpp"
 #include "umpire/util/Macros.hpp"
@@ -26,7 +27,7 @@ void GenericReallocateOperation::transform(void* current_ptr, void** new_ptr,
   const std::size_t old_size = current_allocation->size;
   const std::size_t copy_size = (old_size > new_size) ? new_size : old_size;
 
-  ResourceManager::getInstance().copy(*new_ptr, current_ptr, copy_size);
+  umpire::copy(current_ptr, *new_ptr, copy_size);
 
   allocator.deallocate(current_ptr);
 }
@@ -41,7 +42,7 @@ camp::resources::EventProxy<camp::resources::Resource> GenericReallocateOperatio
   const std::size_t old_size = current_allocation->size;
   const std::size_t copy_size = (old_size > new_size) ? new_size : old_size;
 
-  auto event = ResourceManager::getInstance().copy(*new_ptr, current_ptr, ctx, copy_size);
+  auto event = umpire::copy(current_ptr, *new_ptr, copy_size, ctx);
 
   allocator.deallocate(current_ptr);
 

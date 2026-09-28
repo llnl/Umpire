@@ -8,6 +8,7 @@
 
 #include "umpire/ResourceManager.hpp"
 #include "umpire/strategy/QuickPool.hpp"
+#include "umpire/op.hpp"
 
 constexpr int BLOCK_SIZE = 256;
 constexpr int NUM_THREADS = 4096;
@@ -67,7 +68,7 @@ int main(int, char**)
   }
 #endif
 
-  rm.copy(b, a);
+  umpire::copy(a, b, NUM_THREADS);
   b = static_cast<double*>(rm.move(b, rm.getAllocator("HOST")));
 
   UMPIRE_ASSERT(b[BLOCK_SIZE] == (BLOCK_SIZE * MULTIPLE) && "Error: incorrect value!");

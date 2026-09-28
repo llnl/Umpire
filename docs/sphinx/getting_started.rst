@@ -105,13 +105,13 @@ allocate memory in different places. Let's ask for a device allocator:
 
 This code gets the default device allocator, and uses it to allocate an array
 of 100 floats. Remember, since this is a device pointer, there is no guarantee
-you will be able to access it on the host.  Luckily, Umpire's ResourceManager
-can copy one pointer to another transparently. Let's copy the data from our
-first pointer to the DEVICE-allocated pointer.
+you will be able to access it on the host.  Luckily, Umpire provides a
+``copy`` function that can copy one pointer to another transparently. Let's
+copy the data from our first pointer to the DEVICE-allocated pointer.
 
 .. code-block:: cpp
 
-  rm.copy(my_data, my_data_device);
+  umpire::copy(my_data, my_data_device, 100);
 
 To free any memory allocated, you can use the deallocate function of the
 Allocator, or the ResourceManager. Asking the ResourceManager to deallocate

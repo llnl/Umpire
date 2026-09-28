@@ -7,10 +7,12 @@
 #include "umpire/DeviceAllocator.hpp"
 
 #include <stdio.h>
-#include <string.h>
+
+#include <cstring>
 
 #include "umpire/ResourceManager.hpp"
 #include "umpire/device_allocator_helper.hpp"
+#include "umpire/op.hpp"
 #include "umpire/resource/MemoryResourceTypes.hpp"
 #include "umpire/util/Macros.hpp"
 
@@ -27,11 +29,15 @@ __host__ DeviceAllocator::DeviceAllocator(Allocator allocator, size_t size, cons
   auto device_alloc = rm.getAllocator("UM");
 
   m_counter = static_cast<unsigned int*>(device_alloc.allocate(sizeof(unsigned int)));
-  rm.memset(m_counter, 0);
+  umpire::memset(m_counter, 0, 1);
 
   // convert the string name to a char name
   const char* name = old_name.c_str();
-  memset(m_name, '\0', old_name.length() + 1);
+  // Must be explicitly ::memset: an unqualified call here resolves to the
+  // umpire::memset operation (visible via op.hpp), which requires an
+  // allocation-map-tracked pointer -- m_name is a member of a potentially
+  // stack-resident object.
+  std::memset(m_name, '\0', old_name.length() + 1);
   int i = 0;
   do {
     m_name[i] = name[i];

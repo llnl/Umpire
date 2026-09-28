@@ -51,7 +51,6 @@ module umpire_fortran_introspection_tests
 end module umpire_fortran_introspection_tests
 
 program fortran_test
-  use fruit
   use umpire_fortran_introspection_tests
 
   implicit none

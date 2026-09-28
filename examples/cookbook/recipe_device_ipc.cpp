@@ -12,6 +12,7 @@
 #include "umpire/Umpire.hpp"
 #include "umpire/strategy/DeviceIpcAllocator.hpp"
 #include "umpire/util/MemoryResourceTraits.hpp"
+#include "umpire/op.hpp"
 #if defined(UMPIRE_ENABLE_MPI)
 #include <mpi.h>
 #endif
@@ -41,7 +42,8 @@ int main(int argc, char** argv)
 
     // Allocate device memory - only rank 0 will physically allocate
     // All other ranks will import via IPC
-    const size_t size = 1024 * sizeof(float);
+    constexpr std::size_t num_elements = 1024;
+    const size_t size = num_elements * sizeof(float);
     float* data = static_cast<float*>(ipc_allocator.allocate(size));
 
     std::cout << "Rank " << rank << ": Got device memory at " << data << std::endl;
@@ -59,7 +61,7 @@ int main(int argc, char** argv)
       }
 
       // Copy to device
-      rm.copy(data, host_data, size);
+      umpire::copy(host_data, data, num_elements);
       host_allocator.deallocate(host_data);
     }
 
@@ -76,7 +78,7 @@ int main(int argc, char** argv)
     // All ranks can now access the data
     // Verify by copying a portion back to host
     float* value = static_cast<float*>(host_allocator.allocate(sizeof(float)));
-    rm.copy(value, data + 1, sizeof(float));
+    umpire::copy(data + 1, value, 1);
 
     std::cout << "Rank " << rank << ": second value is " << *value << std::endl;
 

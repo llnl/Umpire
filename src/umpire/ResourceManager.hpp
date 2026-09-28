@@ -7,6 +7,8 @@
 #ifndef UMPIRE_ResourceManager_HPP
 #define UMPIRE_ResourceManager_HPP
 
+#include "umpire/config.hpp"
+
 #include <list>
 #include <memory>
 #include <mutex>
@@ -26,7 +28,11 @@ namespace umpire {
 
 namespace op {
 class MemoryOperation;
-}
+
+template <template <typename... T> class Op>
+struct op_caller;
+
+} // namespace op
 
 namespace strategy {
 class ZeroByteHandler;
@@ -40,6 +46,10 @@ class AllocateNull;
  * \brief
  */
 class ResourceManager {
+  // Friend declarations for template operations
+  template <template <typename... T> class Op>
+  friend struct op::op_caller;
+
  public:
   /*!
    * \brief
@@ -261,9 +271,34 @@ class ResourceManager {
    * \param dst_ptr Destination pointer.
    * \param src_ptr Source pointer.
    * \param size Size in bytes.
+   *
+   * \deprecated Use the global umpire::copy(src, dst, size) function instead.
+   *
+   * \warning umpire::copy takes arguments in (src, dst, size) order, which is
+   *          the REVERSE of this method's (dst, src, size) order. A mechanical
+   *          migration that does not swap the pointer arguments will compile
+   *          cleanly but silently copy data in the wrong direction. In
+   *          addition, umpire::copy requires an explicit, non-zero size --
+   *          it does not auto-detect the size from the allocation the way
+   *          this method does when size == 0.
    */
+  [[deprecated("Use umpire::copy(src, dst, size) instead -- NOTE: argument order is REVERSED (src, dst) vs this method's (dst, src)")]]
   void copy(void* dst_ptr, void* src_ptr, std::size_t size = 0);
 
+  /*!
+   * \brief Asynchronously copy size bytes of data from src_ptr to dst_ptr.
+   *
+   * \deprecated Use the global umpire::copy(src, dst, size, ctx) function instead.
+   *
+   * \warning umpire::copy takes arguments in (src, dst, size, ctx) order,
+   *          which is the REVERSE of this method's (dst, src, ctx, size)
+   *          order. A mechanical migration that does not swap the pointer
+   *          arguments will compile cleanly but silently copy data in the
+   *          wrong direction. In addition, umpire::copy requires an
+   *          explicit, non-zero size -- it does not auto-detect the size
+   *          from the allocation the way this method does when size == 0.
+   */
+  [[deprecated("Use umpire::copy(src, dst, size, ctx) instead -- NOTE: argument order is REVERSED (src, dst) vs this method's (dst, src)")]]
   camp::resources::EventProxy<camp::resources::Resource> copy(void* dst_ptr, void* src_ptr,
                                                               camp::resources::Resource& ctx, std::size_t size = 0);
 
@@ -273,9 +308,13 @@ class ResourceManager {
    * \param ptr Pointer to data.
    * \param val Value to set.
    * \param length Number of bytes to set to val.
+   * 
+   * \deprecated Use the global umpire::memset function instead.
    */
+  [[deprecated("Use the global umpire::memset function instead")]]
   void memset(void* ptr, int val, std::size_t length = 0);
 
+  [[deprecated("Use the global umpire::memset function with Resource instead")]]
   camp::resources::EventProxy<camp::resources::Resource> memset(void* ptr, int val, camp::resources::Resource& ctx,
                                                                 std::size_t length = 0);
 
@@ -299,10 +338,13 @@ class ResourceManager {
    * a nullptr, and a zero-byte allocation will be returned.
    *
    * \return Reallocated pointer.
-   *
+   * 
+   * \deprecated Use the global umpire::reallocate function instead.
    */
+  [[deprecated("Use the global umpire::reallocate function instead")]]
   void* reallocate(void* current_ptr, std::size_t new_size);
 
+  [[deprecated("Use the global umpire::reallocate function with Resource instead")]]
   void* reallocate(void* current_ptr, std::size_t new_size, camp::resources::Resource& ctx);
 
   /*!
@@ -319,10 +361,13 @@ class ResourceManager {
    * a nullptr, and a zero-byte allocation will be returned.
    *
    * \return Reallocated pointer.
-   *
+   * 
+   * \deprecated Use the global umpire::reallocate function instead.
    */
+  [[deprecated("Use the global umpire::reallocate function instead")]]
   void* reallocate(void* current_ptr, std::size_t new_size, Allocator allocator);
 
+  [[deprecated("Use the global umpire::reallocate function with Resource instead")]]
   void* reallocate(void* current_ptr, std::size_t new_size, Allocator allocator, camp::resources::Resource& ctx);
 
   /*!
@@ -332,6 +377,9 @@ class ResourceManager {
    * \param allocator Allocator to use to allocate new memory for moved data.
    *
    * \return Pointer to new location of data.
+   *
+   * \note No umpire::move free-function replacement exists yet (planned
+   *       follow-up). This method remains supported and is NOT deprecated.
    */
   void* move(void* src_ptr, Allocator allocator);
 
@@ -348,7 +396,10 @@ class ResourceManager {
    * \param ptr Pointer to prefech
    * \param device Device to prefetch data to
    * \param ctx Resource to use for asynchronous operation
+   * 
+   * \deprecated Use the global umpire::prefetch function instead.
    */
+  [[deprecated("Use the global umpire::prefetch function instead")]]
   camp::resources::EventProxy<camp::resources::Resource> prefetch(void* ptr, int device,
                                                                   camp::resources::Resource& ctx);
 
@@ -402,8 +453,10 @@ class ResourceManager {
 
   void* reallocate_impl(void* current_ptr, std::size_t new_size, Allocator allocator, camp::resources::Resource& ctx);
 
+ public:
   util::AllocationMap m_allocations;
 
+ private:
   std::list<std::unique_ptr<strategy::AllocationStrategy>> m_allocators;
   std::vector<std::string> m_shared_allocator_names;
 
@@ -425,6 +478,9 @@ class ResourceManager {
   friend std::vector<util::AllocationRecord> get_allocator_records(Allocator);
   friend strategy::ZeroByteHandler;
   friend strategy::mixins::AllocateNull;
+
+  template <template <typename... T> class Op>
+  friend struct umpire::op::op_caller;
 };
 
 } // end namespace umpire

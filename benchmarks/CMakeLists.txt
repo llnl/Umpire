@@ -23,6 +23,10 @@ if (UMPIRE_ENABLE_CUDA)
     SOURCES resource_aware_pool_stress_test.cpp
     DEPENDS_ON umpire cuda)
 
+  blt_add_target_compile_flags(
+    TO resource_aware_pool_stress_test
+    FLAGS ${UMPIRE_DISABLE_DEPRECATED_WARNINGS_FLAG})
+
   if (UMPIRE_ENABLE_DEVICE_ALLOCATOR)
   blt_add_executable(
     NAME device_allocator_stress_test
@@ -42,6 +46,10 @@ elseif (UMPIRE_ENABLE_HIP)
     NAME resource_aware_pool_stress_test
     SOURCES resource_aware_pool_stress_test.cpp
     DEPENDS_ON umpire blt::hip blt::hip_runtime)
+
+  blt_add_target_compile_flags(
+    TO resource_aware_pool_stress_test
+    FLAGS ${UMPIRE_DISABLE_DEPRECATED_WARNINGS_FLAG})
 
   if (UMPIRE_ENABLE_DEVICE_ALLOCATOR)
     blt_add_executable(
@@ -64,6 +72,10 @@ blt_add_executable(
   NAME copy_stress_test
   SOURCES copy_stress_test.cpp
   DEPENDS_ON ${stress_test_depends})
+
+blt_add_target_compile_flags(
+  TO copy_stress_test
+  FLAGS ${UMPIRE_DISABLE_DEPRECATED_WARNINGS_FLAG})
 
 blt_add_executable(
   NAME fixed_pool_stress_test
@@ -136,6 +148,10 @@ if (UMPIRE_ENABLE_BENCHMARKS)
     SOURCES copy_benchmarks.cpp
     DEPENDS_ON ${benchmark_depends})
 
+  blt_add_target_compile_flags(
+    TO copy_benchmarks
+    FLAGS ${UMPIRE_DISABLE_DEPRECATED_WARNINGS_FLAG})
+
   blt_add_benchmark(
     NAME copy_benchmarks
     COMMAND copy_benchmarks)
@@ -148,4 +164,13 @@ if (UMPIRE_ENABLE_BENCHMARKS)
   blt_add_benchmark(
     NAME inspector_benchmarks
     COMMAND inspector_benchmarks)
+
+  blt_add_executable(
+    NAME copy_performance_benchmark
+    SOURCES op/copy_performance_benchmark.cpp
+    DEPENDS_ON ${benchmark_depends})
+
+  blt_add_benchmark(
+    NAME copy_performance_benchmark
+    COMMAND copy_performance_benchmark)
 endif()

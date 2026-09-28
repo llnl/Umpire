@@ -12,6 +12,7 @@
 #include "umpire/util/Macros.hpp"
 #include "umpire/util/error.hpp"
 #include "umpire/util/numa.hpp"
+#include "umpire/op.hpp"
 
 #if defined(UMPIRE_ENABLE_CUDA)
 #include <cuda_runtime_api.h>
@@ -52,7 +53,7 @@ int main(int, char**)
     }
 
     // Touch it
-    rm.memset(dst_ptr, 0);
+    umpire::memset(dst_ptr, 0, alloc_size);
 
     // Verify NUMA node
     if (umpire::numa::get_location(dst_ptr) != host_nodes[1]) {
@@ -82,7 +83,7 @@ int main(int, char**)
 
     // Touch it -- this currently uses the host memset operation (thus, copying
     // the memory back)
-    rm.memset(dst_ptr, 0);
+    umpire::memset(dst_ptr, 0, alloc_size);
 
     // Verify NUMA node
     if (umpire::numa::get_location(dst_ptr) != device_nodes[0]) {

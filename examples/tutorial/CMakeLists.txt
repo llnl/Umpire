@@ -88,4 +88,8 @@ endif ()
 
 install(TARGETS ${umpire_tutorials} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+blt_add_target_compile_flags(
+  TO tut_move
+  FLAGS ${UMPIRE_DISABLE_DEPRECATED_WARNINGS_FLAG})
+
 umpire_add_code_checks(PREFIX tutorial)

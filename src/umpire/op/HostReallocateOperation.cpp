@@ -11,6 +11,7 @@
 #include "umpire/ResourceManager.hpp"
 #include "umpire/strategy/mixins/Inspector.hpp"
 #include "umpire/util/error.hpp"
+#include "umpire/op.hpp"
 
 namespace umpire {
 namespace op {
@@ -29,7 +30,7 @@ void HostReallocateOperation::transform(void* current_ptr, void** new_ptr, util:
     *new_ptr = allocator.allocate(new_size);
     const std::size_t copy_size = (old_size > new_size) ? new_size : old_size;
 
-    ResourceManager::getInstance().copy(*new_ptr, current_ptr, copy_size);
+    umpire::copy(current_ptr, *new_ptr, copy_size);
     allocator.deallocate(current_ptr);
   } else {
     auto old_record = ResourceManager::getInstance().deregisterAllocation(current_ptr);
