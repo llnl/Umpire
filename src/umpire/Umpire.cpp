@@ -46,6 +46,28 @@ UMPIRE_EXPORT int UMPIRE_VERSION_SYM{0};
 
 namespace umpire {
 
+#if defined(UMPIRE_ENABLE_INTROSPECTION_HEADER)
+
+void print_allocator_records(Allocator allocator, std::ostream&)
+{
+  // Allocation headers cannot be enumerated
+  UMPIRE_LOG(Info, "print_allocator_records for \""
+                       << allocator.getName()
+                       << "\" is not supported with UMPIRE_ENABLE_INTROSPECTION_HEADER");
+}
+
+std::vector<util::AllocationRecord> get_allocator_records(Allocator allocator)
+{
+  // Allocation headers cannot be enumerated
+  UMPIRE_LOG(Info, "get_allocator_records for \""
+                       << allocator.getName()
+                       << "\" is not supported with UMPIRE_ENABLE_INTROSPECTION_HEADER");
+
+  return {};
+}
+
+#else
+
 void print_allocator_records(Allocator allocator, std::ostream& os)
 {
   std::stringstream ss;
@@ -71,6 +93,8 @@ std::vector<util::AllocationRecord> get_allocator_records(Allocator allocator)
 
   return recs;
 }
+
+#endif // UMPIRE_ENABLE_INTROSPECTION_HEADER
 
 bool pointer_overlaps(void* left_ptr, void* right_ptr)
 {

@@ -19,6 +19,12 @@ TEST(Umpire, ProcessorMemoryStatistics)
 
 TEST(Umpire, InternalMemoryUsage)
 {
+#if defined(UMPIRE_ENABLE_INTROSPECTION_HEADER)
+  // Introspection metadata lives in the allocations themselves
+  ASSERT_EQ(umpire::get_internal_memory_usage(), 0);
+  GTEST_SKIP() << "The allocation map is not used with UMPIRE_ENABLE_INTROSPECTION_HEADER";
+#endif
+
   std::size_t initial_usage = umpire::get_internal_memory_usage();
   ASSERT_GT(initial_usage, 0);
   ASSERT_LT(initial_usage, 1000000000);
