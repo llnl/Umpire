@@ -13,6 +13,8 @@
 #include "umpire/ResourceManager.hpp"
 #include "umpire/Umpire.hpp"
 #include "umpire/config.hpp"
+#include "umpire/strategy/NamedAllocationStrategy.hpp"
+#include "umpire/strategy/NamingShim.hpp"
 
 #if defined (UMPIRE_ENABLE_MPI3_SHARED_MEMORY)
 const std::string trait_name = "SHARED::MPI3";
@@ -46,6 +48,36 @@ TEST(GetCommunicator, SharedAndCached)
   int result;
   MPI_Comm_compare(comm, cached_comm, &result);
   ASSERT_EQ(result, MPI_IDENT);
+}
+
+TEST(GetCommunicator, WrappedSharedAllocator)
+{
+  auto& rm = umpire::ResourceManager::getInstance();
+  auto allocator = rm.getAllocator(alloc_name);
+
+  auto comm = umpire::get_communicator_for_allocator(allocator, MPI_COMM_WORLD);
+  ASSERT_NE(comm, MPI_COMM_NULL);
+
+  // Wrapping a shared-memory allocator must not lose its communicator. The
+  // wrapped communicator contains the same group of ranks as the base one
+  // (MPI_IDENT when the same communicator object is returned, MPI_CONGRUENT
+  // when an equivalent one is created).
+  auto named_allocator =
+      rm.makeAllocator<umpire::strategy::NamedAllocationStrategy>("named_" + alloc_name, allocator);
+  auto named_comm = umpire::get_communicator_for_allocator(named_allocator, MPI_COMM_WORLD);
+  ASSERT_NE(named_comm, MPI_COMM_NULL);
+
+  int result{MPI_UNEQUAL};
+  MPI_Comm_compare(comm, named_comm, &result);
+  ASSERT_TRUE(result == MPI_IDENT || result == MPI_CONGRUENT);
+
+  auto shim_allocator = rm.makeAllocator<umpire::strategy::NamingShim>("shim_" + alloc_name, allocator);
+  auto shim_comm = umpire::get_communicator_for_allocator(shim_allocator, MPI_COMM_WORLD);
+  ASSERT_NE(shim_comm, MPI_COMM_NULL);
+
+  result = MPI_UNEQUAL;
+  MPI_Comm_compare(comm, shim_comm, &result);
+  ASSERT_TRUE(result == MPI_IDENT || result == MPI_CONGRUENT);
 }
 
 #if defined(__linux__) && defined(UMPIRE_ENABLE_MPI3_SHARED_MEMORY)
