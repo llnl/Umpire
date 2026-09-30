@@ -53,6 +53,23 @@ if (NOT TARGET @UMPIRE_FMT_TARGET@)
     ${UMPIRE_PACKAGE_PREFIX_DIR}/lib64/cmake/fmt)
 endif ()
 
+if (@UMPIRE_ENABLE_LOGGING@)
+  if (NOT TARGET spdlog::spdlog)
+    set(UMPIRE_SPDLOG_DIR "@UMPIRE_CONFIG_spdlog_DIR@")
+    if(NOT spdlog_DIR)
+      set(spdlog_DIR ${UMPIRE_SPDLOG_DIR})
+    endif()
+
+    find_dependency(spdlog CONFIG NO_DEFAULT_PATH PATHS
+      ${spdlog_DIR}
+      ${spdlog_DIR}/lib/cmake/spdlog
+      ${spdlog_DIR}/lib64/cmake/spdlog
+      ${UMPIRE_PACKAGE_PREFIX_DIR}
+      ${UMPIRE_PACKAGE_PREFIX_DIR}/lib/cmake/spdlog
+      ${UMPIRE_PACKAGE_PREFIX_DIR}/lib64/cmake/spdlog)
+  endif ()
+endif ()
+
 if (@UMPIRE_ENABLE_SQLITE_EXPERIMENTAL@)
   find_package(SQLite3 REQUIRED)
 endif()

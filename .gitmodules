@@ -13,3 +13,6 @@
 [submodule "src/tpl/umpire/fmt"]
 	path = src/tpl/umpire/fmt
 	url = https://github.com/fmtlib/fmt
+[submodule "src/tpl/umpire/spdlog"]
+	path = src/tpl/umpire/spdlog
+	url = https://github.com/gabime/spdlog.git

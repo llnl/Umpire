@@ -24,7 +24,6 @@ set (umpire_util_headers
   MemoryMap.hpp
   MemoryMap.inl
   node_memory.hpp
-  OutputBuffer.hpp
   Platform.hpp
   allocation_statistics.hpp
   detect_vendor.hpp
@@ -44,12 +43,16 @@ set (umpire_util_sources
   affinity.cpp
   FixedMallocPool.cpp
   io.cpp
-  Logger.cpp
   MPI.cpp
   node_memory.cpp
-  OutputBuffer.cpp
   allocation_statistics.cpp
   detect_vendor.cpp)
+
+if (UMPIRE_ENABLE_LOGGING)
+  set (umpire_util_sources
+    ${umpire_util_sources}
+    Logger.cpp)
+endif ()
 
 if (UMPIRE_ENABLE_NUMA)
   set (umpire_util_sources
@@ -58,6 +61,12 @@ if (UMPIRE_ENABLE_NUMA)
 endif ()
 
 set (umpire_util_depends camp umpire_event umpire_tpl_judy ${UMPIRE_FMT_TARGET})
+
+if (UMPIRE_ENABLE_LOGGING)
+  set (umpire_util_depends
+    ${umpire_util_depends}
+    spdlog::spdlog)
+endif ()
 
 if (NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
   set (umpire_util_depends
@@ -70,12 +79,6 @@ if (UMPIRE_ENABLE_NUMA)
     ${umpire_util_depends}
     numa)
 endif ()
-
-if (UMPIRE_ENABLE_SLIC AND UMPIRE_ENABLE_LOGGING)
-  set (umpire_util_depends
-    ${umpire_util_depends}
-    slic)
-endif()
 
 if (UMPIRE_ENABLE_MPI)
   set (umpire_util_depends

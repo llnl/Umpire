@@ -6,8 +6,9 @@
 "spack_url": "https://github.com/spack/spack.git",
 "spack_branch": "v1.2.2",
 "spack_configs_path": "scripts/radiuss-spack-configs",
-"spack_packages_path": "scripts/radiuss-spack-configs/spack_repo/llnl_radiuss/packages",
+"spack_packages_path": ["scripts/spack_repo/umpire_ci/packages", "scripts/radiuss-spack-configs/spack_repo/llnl_radiuss/packages"],
 "spack_packages_url": "https://github.com/spack/spack-packages.git",
 "spack_packages_commit": "9a3f42ce82c64c7113be24447df76a10184d3b24",
+>>>>>>> a74bd731992348a4860f040a5748ba1a7abc7a95
 "spack_setup_clingo": false
 }
