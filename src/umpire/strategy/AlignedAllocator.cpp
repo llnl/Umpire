@@ -6,7 +6,10 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "umpire/strategy/AlignedAllocator.hpp"
 
+#include <limits>
+
 #include "umpire/util/Macros.hpp"
+#include "umpire/util/error.hpp"
 
 namespace umpire {
 namespace strategy {
@@ -30,6 +33,14 @@ AlignedAllocator::AlignedAllocator(const std::string& name, int id, Allocator al
 
 void* AlignedAllocator::allocate(std::size_t bytes)
 {
+  const std::size_t overhead{sizeof(void*) + m_alignment - 1};
+
+  if (bytes > std::numeric_limits<std::size_t>::max() - overhead) {
+    UMPIRE_ERROR(runtime_error, fmt::format("Cannot allocate {} bytes with alignment {}, the total does not fit in "
+                                            "std::size_t",
+                                            bytes, m_alignment));
+  }
+
   std::size_t total_bytes = bytes + sizeof(void*) + m_alignment - 1;
   UMPIRE_LOG(Debug, "requested: " << bytes << " actual: " << bytes + m_alignment - 1);
 
