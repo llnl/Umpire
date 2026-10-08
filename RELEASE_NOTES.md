@@ -1,3 +1,9 @@
+# v2026.07.2
+
+## Bug Fixes
+
+- `get_communicator_for_allocator()` now works regardless of whether the shared memory allocator is wrapped or not
+
 # v2026.07.1
 
 ## Changes Impacting Builds
