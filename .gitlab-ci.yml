@@ -234,17 +234,42 @@ tuolumne-build-and-test:
         job: 'generate-job-lists'
 
 # MULTI-PROJECT PIPELINE
+# If testing develop branch, always test RAJAPerf, CHAI, and CARE with lastest RAJA develop commit.
+# If testing other branches, allow manually triggering the multi-project pipelines with the current RAJA commit.
+# Allow deactivating any multi-project pipeline by setting MULTI_PROJECT variable to "OFF".
 trigger-chai:
   stage: multi-project
   rules:
+    - if: $MULTI_PROJECT != "OFF" && $CI_COMMIT_BRANCH == "develop"
+      when: on_success
+      allow_failure: true
     - if: $MULTI_PROJECT != "OFF"
       when: manual
+      allow_failure: true
     - when: never
   allow_failure: true
   inherit:
     variables: false
   variables:
-    UPDATE_UMPIRE: ${CI_COMMIT_SHA}
+    UMPIRE_REFERENCE: ${CI_COMMIT_SHA}
   trigger:
     project: radiuss/multi-project/chai-trigger
+    branch: develop
+
+trigger-care:
+  stage: multi-project
+  rules:
+    - if: $MULTI_PROJECT != "OFF" && $CI_COMMIT_BRANCH == "develop"
+      when: on_success
+      allow_failure: true
+    - if: $MULTI_PROJECT != "OFF"
+      when: manual
+      allow_failure: true
+    - when: never
+  inherit:
+    variables: false
+  variables:
+    UPDATE_UMPIRE: ${CI_COMMIT_SHA}
+  trigger:
+    project: radiuss/multi-project/care-trigger
     branch: develop
