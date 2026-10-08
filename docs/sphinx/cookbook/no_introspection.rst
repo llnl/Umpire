@@ -9,6 +9,11 @@ for allocations that come from a particular :class:`umpire::Allocator`, you can
 turn off the introspection and avoid the overhead of tracking the associated
 metadata.
 
+If you still want basic introspection (like size and allocator queries) but
+at a lower cost, Umpire can also be built to store this metadata in a header
+in front of each allocation instead of in the allocation map; see
+:doc:`../features/introspection_header`.
+
 .. warning::
     Disabling introspection means that allocations from this Allocator cannot
     be used for operations, or size and location queries.

@@ -38,6 +38,17 @@ using resource_type = camp::resources::Hip;
 using resource_type = camp::resources::Host;
 #endif
 
+//
+// Operations on a pointer offset into an allocation require an interior
+// pointer lookup, which allocation headers cannot provide.
+//
+#if defined(UMPIRE_ENABLE_INTROSPECTION_HEADER)
+#define SKIP_IF_NO_OFFSET_LOOKUP() \
+  GTEST_SKIP() << "Interior pointer lookup is not supported with UMPIRE_ENABLE_INTROSPECTION_HEADER"
+#else
+#define SKIP_IF_NO_OFFSET_LOOKUP() ((void)0)
+#endif
+
 static int s_counter{0};
 
 struct NullStrategy {
@@ -238,6 +249,8 @@ TYPED_TEST(CopyTest, Copy)
 
 TYPED_TEST(CopyTest, Single)
 {
+  SKIP_IF_NO_OFFSET_LOOKUP();
+
   auto& rm = umpire::ResourceManager::getInstance();
 
   this->check_array[10] = 3.14f;
@@ -250,6 +263,8 @@ TYPED_TEST(CopyTest, Single)
 
 TYPED_TEST(CopyTest, Offset)
 {
+  SKIP_IF_NO_OFFSET_LOOKUP();
+
   auto& rm = umpire::ResourceManager::getInstance();
 
   for (std::size_t i = 0; i < this->m_size; ++i) {
@@ -322,6 +337,8 @@ TYPED_TEST(MemsetTest, Memset)
 
 TYPED_TEST(MemsetTest, Offset)
 {
+  SKIP_IF_NO_OFFSET_LOOKUP();
+
   auto& rm = umpire::ResourceManager::getInstance();
 
   rm.memset(this->source_array, 1);
@@ -450,6 +467,8 @@ TYPED_TEST(ReallocateTest, Reallocate)
 
 TYPED_TEST(ReallocateTest, ReallocateLarger)
 {
+  SKIP_IF_NO_OFFSET_LOOKUP();
+
   umpire::ResourceManager& rm = umpire::ResourceManager::getInstance();
 
   const std::size_t reallocated_size = (this->m_size + 50);
