@@ -102,8 +102,12 @@ TEST(DestroyAllocatorTest, ActiveAllocationsNonStrictMode)
   // Verify allocator is destroyed
   ASSERT_FALSE(rm.isAllocator("test_pool_nonstrict"));
 
+#if !defined(UMPIRE_ENABLE_INTROSPECTION_HEADER)
   // Allocation record is removed to avoid dangling allocator pointers
+  // (with header-based introspection the leaked memory keeps its header, and
+  // may itself have been freed by the pool, so it cannot be queried)
   ASSERT_FALSE(rm.hasAllocator(ptr));
+#endif
 }
 
 TEST(DestroyAllocatorTest, FreeAllocationsOnDestroy)
@@ -121,6 +125,18 @@ TEST(DestroyAllocatorTest, FreeAllocationsOnDestroy)
   ASSERT_NE(nullptr, ptr2);
   ASSERT_NE(nullptr, ptr3);
 
+#if defined(UMPIRE_ENABLE_INTROSPECTION_HEADER)
+  // Allocations cannot be enumerated to free them
+  ASSERT_THROW(rm.destroyAllocator("test_pool_free", true), umpire::runtime_error);
+
+  pool.deallocate(ptr1);
+  pool.deallocate(ptr2);
+  pool.deallocate(ptr3);
+  rm.destroyAllocator("test_pool_free", true);
+
+  // Verify allocator is destroyed
+  ASSERT_FALSE(rm.isAllocator("test_pool_free"));
+#else
   // Destroy with free_allocations=true - should succeed and free all allocations
   rm.destroyAllocator("test_pool_free", true);
 
@@ -131,6 +147,7 @@ TEST(DestroyAllocatorTest, FreeAllocationsOnDestroy)
   ASSERT_FALSE(rm.hasAllocator(ptr1));
   ASSERT_FALSE(rm.hasAllocator(ptr2));
   ASSERT_FALSE(rm.hasAllocator(ptr3));
+#endif
 }
 
 TEST(DestroyAllocatorTest, DestroyAllocatorWithAliases)

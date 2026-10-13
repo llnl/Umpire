@@ -11,9 +11,22 @@
 
 #include "gtest/gtest.h"
 #include "umpire/ResourceManager.hpp"
+#include "umpire/config.hpp"
 #include "umpire/strategy/DynamicPoolList.hpp"
 #include "umpire/strategy/PoolCoalesceHeuristic.hpp"
 #include "umpire/strategy/QuickPool.hpp"
+
+//
+// The heuristic tests assert exact block sizes and counts, which assume the
+// requested sizes arrive at the pool unchanged. This does not hold when every
+// allocation is padded by an introspection header.
+//
+#if defined(UMPIRE_ENABLE_INTROSPECTION_HEADER)
+#define SKIP_IF_SIZES_ARE_PADDED() \
+  GTEST_SKIP() << "Exact pool block accounting does not hold with UMPIRE_ENABLE_INTROSPECTION_HEADER"
+#else
+#define SKIP_IF_SIZES_ARE_PADDED() ((void)0)
+#endif
 
 namespace {
 template <typename T>
@@ -92,6 +105,8 @@ TYPED_TEST(PoolHeuristicsTest, PercentReleasable)
 
 TYPED_TEST(PoolHeuristicsTest, PercentReleasableHWM)
 {
+  SKIP_IF_SIZES_ARE_PADDED();
+
   using myPoolType = typename TestFixture::myPoolType;
   using TestAllocator = typename TestFixture::TestAllocator;
   TestAllocator a;
@@ -159,6 +174,8 @@ TYPED_TEST(PoolHeuristicsTest, BlocksReleasable)
 
 TYPED_TEST(PoolHeuristicsTest, BlocksReleasableHWM)
 {
+  SKIP_IF_SIZES_ARE_PADDED();
+
   using myPoolType = typename TestFixture::myPoolType;
   using TestAllocator = typename TestFixture::TestAllocator;
   TestAllocator a;
