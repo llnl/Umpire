@@ -11,7 +11,7 @@ purpose. It can also be used with STL objects like ``std::vector``.
 A :class:`umpire::TypedAllocator` is constructed from any existing Allocator,
 and provides the same interface as the normal :class:`umpire::Allocator`.
 However, when you call allocate, this argument is the number of objects you
-want to allocate, no the total number of bytes:
+want to allocate, not the total number of bytes:
 
 .. literalinclude:: ../../../examples/tutorial/tut_typed_allocator.cpp
    :start-after: _sphinx_tag_tut_typed_alloc_start

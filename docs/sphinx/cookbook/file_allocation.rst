@@ -37,7 +37,7 @@ The complete example is included below:
 Using Burst Buffers On Lassen
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-On Lassen, 1) Download the latest version of Umpire 2) request a private node to build:
+On Lassen, 1) download the latest version of Umpire 2) request a private node to build:
 
 .. code-block:: bash
 
