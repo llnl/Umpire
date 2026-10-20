@@ -360,14 +360,20 @@ std::map<int, MPI_Comm>& get_cached_communicators()
 
 MPI_Comm get_communicator_for_allocator(Allocator a, MPI_Comm comm)
 {
+  // Walk the strategy parent chain so that wrapping strategies (e.g.
+  // NamedAllocationStrategy, NamingShim) resolve to the communicator of the
+  // underlying shared-memory allocator.
+  for (auto strategy = a.getAllocationStrategy(); strategy != nullptr; strategy = strategy->getParent()) {
 #if defined(UMPIRE_ENABLE_IPC_SHARED_MEMORY) && defined(UMPIRE_ENABLE_DEVICE)
-  if (auto alloc = dynamic_cast<strategy::DeviceIpcAllocator*>(a.getAllocationStrategy()))
-    return alloc->get_scope_communicator();
+    if (auto alloc = dynamic_cast<umpire::strategy::DeviceIpcAllocator*>(strategy))
+      return alloc->get_scope_communicator();
 #endif
 #if defined(UMPIRE_ENABLE_MPI3_SHARED_MEMORY)
-  if (auto resource = dynamic_cast<resource::HostMpi3SharedMemoryResource*>(a.getAllocationStrategy()))
-    return resource->getSharedCommunicator();
+    if (auto shared_resource = dynamic_cast<umpire::resource::HostMpi3SharedMemoryResource*>(strategy))
+      return shared_resource->getSharedCommunicator();
 #endif
+    UMPIRE_USE_VAR(strategy);
+  }
 
   std::map<int, MPI_Comm>& cached_communicators = get_cached_communicators();
 
