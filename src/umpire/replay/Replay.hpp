@@ -150,6 +150,7 @@ template <typename Strategy>
 inline std::string replay_strategy_name(Strategy*)
 {
   static_assert(always_false<Strategy>::value, "Replay strategy name is not implemented for this allocator type");
+  return {};
 }
 
 template <typename Pool>
