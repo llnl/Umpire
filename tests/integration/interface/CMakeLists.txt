@@ -62,6 +62,20 @@ if (UMPIRE_ENABLE_C)
     NAME version_c_tests
     COMMAND version_c_tests)
 
+  blt_add_executable(
+    NAME aligned_pool_c_tests
+    SOURCES aligned_pool_c_tests.cpp
+    DEPENDS_ON ${interface_tests_depends})
+
+  target_include_directories(
+    aligned_pool_c_tests
+    PRIVATE
+    ${PROJECT_BINARY_DIR}/include)
+
+  blt_add_test(
+    NAME aligned_pool_c_tests
+    COMMAND aligned_pool_c_tests)
+
   if (UMPIRE_ENABLE_FORTRAN)
     add_subdirectory(fortran)
   endif()

@@ -38,6 +38,7 @@ blt_add_test(
   COMMAND umpire_tests)
 
 add_subdirectory(alloc)
+add_subdirectory(event)
 add_subdirectory(op)
 add_subdirectory(resource)
 add_subdirectory(util)

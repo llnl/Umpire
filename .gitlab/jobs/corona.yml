@@ -17,7 +17,12 @@
 # We keep ${PROJECT_<MACHINE>_VARIANTS} and ${PROJECT_<MACHINE>_DEPS} So that
 # the comparison with the original job is easier.
 
-# No overridden jobs so far.
+# We need to set the fortran compiler to enforce coherent CXX support accross build and link:
+rocmcc_6_4_3_hip:
+  variables:
+    SPEC: "${PROJECT_CORONA_VARIANTS} +rocm amdgpu_target=gfx906 %c=llvm-amdgpu@=6.4.3 %cxx=llvm-amdgpu@=6.4.3 %fortran=gcc@13: ^hip@6.4.3 ${PROJECT_CORONA_DEPS}"
+    MODULE_LIST: "rocm/6.4.3"
+  extends: .job_on_corona
 
 ############
 # Extra jobs

@@ -79,7 +79,13 @@ To create an allocator with the MPI3 Shared Memory resource, you can do the foll
 .. code-block:: cpp
 
    auto traits{umpire::get_default_resource_traits("SHARED::MPI3")};
-   auto node_allocator{rm.makeResource("SHARED::mpi3_alloc", traits)};
+   traits.scope = umpire::MemoryResourceTraits::shared_scope::socket; // or node
+   auto node_allocator{rm.makeResource("SHARED::MPI3::mpi3_alloc", traits)};
+
+.. note::
+   Socket scope requires Linux and MPI ranks bound such that each rank's CPU affinity mask maps to a single socket.
+   Use ``umpire::resource::affinity_maps_to_single_socket(reason)`` to check the calling rank, or
+   ``umpire::can_use_socket_scoped_mpi3_shared_memory(comm, reason)`` to check every rank in an MPI communicator.
 
 See the bottom of this page for a full example of how to use MPI3 Shared Memory Allocators with Umpire.
 
@@ -97,9 +103,9 @@ To create these Shared Memory allocators, you can do the following:
    auto ipc_traits{umpire::get_default_resource_traits("SHARED::POSIX")};
 
    // then create an allocator:
-   auto mpi3_node_allocator{rm.makeResource("SHARED::mpi3_alloc", traits)};
+   auto mpi3_node_allocator{rm.makeResource("SHARED::MPI3::mpi3_alloc", mpi3_traits)};
    // or
-   auto ipc_node_allocator{rm.makeResource("SHARED::ipc_alloc", traits)};
+   auto ipc_node_allocator{rm.makeResource("SHARED::POSIX::ipc_alloc", ipc_traits)};
 
    // and allocate with
    mpi3_node_allocator.allocate(1024 * sizeof(double));
@@ -131,4 +137,3 @@ when creating the MPI3 Shared Memory allocator, a name is not needed when alloca
 
 .. literalinclude:: ../../../examples/mpi3_shared_memory.cpp
    :language: cpp
-

@@ -26,7 +26,7 @@ which set it apart from other Umpire allocators.
 4. Although Umpire does not need to have MPI enabled in order to provide IPC Shared Memory, if users wish to associate shared memory with MPI communicators, Umpire will need to be built with MPI enabled. Of course for the MPI3 Shared Memory, MPI is required.
 5. It most likely won't make sense to use memory pools with a shared memory allocator. The way shared memory allocators are implemented makes them already kind of pool-like. Since you have to give them a size when you create them, that is basically the "chunk" of memory you have to work with. Then, the shared memory allocator will manage that chunk for you. Therefore, we *do not* recommend that you use pools on top of shared memory allocators.
 6. For some LC machines, running Shared Memory Allocators on the login node may produce runtime errors because the login node may not have access to the correct files. If you get an error on the login node, try a compute node instead.
-7. MPI3 Shared Memory Allocators only support a `shared_scope` trait of `node`. For IPC Shared Memory, there is an option for either `node` or `socket`.
+7. MPI3 Shared Memory Allocators support `shared_scope` traits of `node` and `socket`. Socket scope requires Linux and MPI ranks bound such that each rank's CPU affinity mask maps to a single socket. IPC Shared Memory Allocators support `node` scope.
 8. MPI3 Shared Memory Allocators do not need an explicit name during creation like IPC Shared Memory Allocators do.
 
 Enabling Both Shared Memory Allocators
@@ -80,6 +80,22 @@ Shared Memory allocators. For example, you can grab the MPI communicator for a p
    If you use the ``umpire::get_communicators_for_allocator(...)`` helper function then you MUST
    also call ``umpire::cleanup_cached_communicators()`` function before you call ``MPI_Finalize()``
    in order to avoid memory leaks.
+
+MPI3 socket-scoped shared memory also provides CPU-affinity preflight helpers:
+
+.. code-block:: cpp
+
+   std::string reason;
+
+   // Local-rank check. This inspects only the calling rank's CPU affinity mask.
+   if (!umpire::resource::affinity_maps_to_single_socket(reason)) {
+     // The calling rank is not pinned to exactly one socket.
+   }
+
+   // Collective check. Every rank in the communicator must call this function.
+   if (!umpire::can_use_socket_scoped_mpi3_shared_memory(MPI_COMM_WORLD, reason)) {
+     // At least one rank in MPI_COMM_WORLD cannot use socket scope.
+   }
 
 Additionally, we can double check that an allocator has the ``SHARED`` memory resource by asserting:
 

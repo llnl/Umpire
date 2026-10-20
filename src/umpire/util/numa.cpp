@@ -58,6 +58,19 @@ int get_location(void* ptr)
   return numa_node;
 }
 
+int node_of_cpu(int cpu)
+{
+  if (numa_available() < 0)
+    UMPIRE_ERROR(runtime_error, "libnuma is unusable.");
+
+  const int numa_node = numa_node_of_cpu(cpu);
+  if (numa_node < 0) {
+    UMPIRE_ERROR(runtime_error, fmt::format("numa::node_of_cpu error for cpu {}", cpu));
+  }
+
+  return numa_node;
+}
+
 std::vector<int> get_host_nodes()
 {
   if (numa_available() < 0)

@@ -28,8 +28,9 @@ std::unique_ptr<resource::MemoryResource> HostMpi3SharedMemoryResourceFactory::c
 std::unique_ptr<resource::MemoryResource> HostMpi3SharedMemoryResourceFactory::create(const std::string& name, int id,
                                                                                       MemoryResourceTraits traits)
 {
-  if (traits.scope != MemoryResourceTraits::shared_scope::node) {
-    UMPIRE_ERROR(runtime_error, "HostMpi3SharedMemoryResource only supports shared_scope::node");
+  if (traits.scope != MemoryResourceTraits::shared_scope::node &&
+      traits.scope != MemoryResourceTraits::shared_scope::socket) {
+    UMPIRE_ERROR(runtime_error, "HostMpi3SharedMemoryResource only supports shared_scope::node or ::socket");
   }
   return util::make_unique<HostMpi3SharedMemoryResource>(name, id, traits);
 }

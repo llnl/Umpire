@@ -16,10 +16,10 @@
 # We keep ${PROJECT_<MACHINE>_VARIANTS} and ${PROJECT_<MACHINE>_DEPS} So that
 # the comparison with the original job is easier.
 
-# Override rocm 7.2.0 job to allow failure
-rocmcc_7_2_0_hip:
+# Override rocm 7.2.1 job to allow failure
+rocmcc_7_2_1_hip:
   variables:
-    SPEC: "${PROJECT_TUOLUMNE_VARIANTS} +rocm amdgpu_target=gfx942 %llvm-amdgpu@=7.2.0 ^hip@7.2.0 ${PROJECT_TUOLUMNE_DEPS}"
+    SPEC: "${PROJECT_TUOLUMNE_VARIANTS} +rocm amdgpu_target=gfx942 %llvm-amdgpu@=7.2.1 ^hip@7.2.1 ${PROJECT_TUOLUMNE_DEPS}"
   extends: .job_on_tuolumne
   allow_failure: true
 

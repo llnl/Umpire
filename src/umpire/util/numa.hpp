@@ -26,6 +26,9 @@ void move_to_node(void* ptr, std::size_t bytes, int node);
 // Return the numa node where address ptr resides
 int get_location(void* ptr);
 
+// Return the NUMA node associated with a CPU
+int node_of_cpu(int cpu);
+
 // List host NUMA nodes
 std::vector<int> get_host_nodes();
 

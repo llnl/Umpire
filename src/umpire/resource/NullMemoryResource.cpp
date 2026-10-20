@@ -48,14 +48,16 @@ void NullMemoryResource::deallocate(void* ptr, std::size_t UMPIRE_UNUSED_ARG(siz
   UMPIRE_LOG(Debug, "(ptr=" << ptr << ")");
 
   auto iter = m_size_map.find(ptr);
-  auto size = iter->second;
+  // Copy the size before erase() returns the map's value slot to its
+  // internal pool, which overwrites the slot's storage
+  const std::size_t size = *(iter->second);
 
   m_size_map.erase(ptr);
 
 #if !defined(_MSC_VER)
-  munmap(ptr, *size);
+  munmap(ptr, size);
 #else
-  VirtualFree(ptr, *size, MEM_RELEASE);
+  VirtualFree(ptr, size, MEM_RELEASE);
 #endif
 }
 

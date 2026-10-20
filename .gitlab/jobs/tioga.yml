@@ -16,10 +16,10 @@
 # We keep ${PROJECT_<MACHINE>_VARIANTS} and ${PROJECT_<MACHINE>_DEPS} So that
 # the comparison with the original job is easier.
 
-# Override rocm 7.2.0 job to allow failure
-rocmcc_7_2_0_hip:
+# Override rocm 7.2.1 job to allow failure
+rocmcc_7_2_1_hip:
   variables:
-    SPEC: "${PROJECT_TIOGA_VARIANTS} +rocm amdgpu_target=gfx90a %llvm-amdgpu@=7.2.0 ^hip@7.2.0 ${PROJECT_TIOGA_DEPS}"
+    SPEC: "${PROJECT_TIOGA_VARIANTS} +rocm amdgpu_target=gfx90a %llvm-amdgpu@=7.2.1 ^hip@7.2.1 ${PROJECT_TIOGA_DEPS}"
   extends: .job_on_tioga
   allow_failure: true
 

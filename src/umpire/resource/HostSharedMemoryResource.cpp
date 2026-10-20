@@ -46,6 +46,11 @@ void HostSharedMemoryResource::deallocate(void* ptr, std::size_t)
   return pimpl->deallocate(ptr);
 }
 
+void HostSharedMemoryResource::release()
+{
+  return pimpl->release();
+}
+
 bool HostSharedMemoryResource::isPageable() noexcept
 {
 #if defined(UMPIRE_ENABLE_CUDA)

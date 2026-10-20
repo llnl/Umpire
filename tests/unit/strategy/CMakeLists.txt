@@ -39,3 +39,12 @@ blt_add_executable(
 blt_add_test(
   NAME zero_byte_handler_tests
   COMMAND zero_byte_handler_tests)
+
+blt_add_executable(
+  NAME aligned_allocation_tests
+  SOURCES aligned_allocation_tests.cpp
+  DEPENDS_ON ${strategy_tests_depends})
+
+blt_add_test(
+  NAME aligned_allocation_tests
+  COMMAND aligned_allocation_tests)

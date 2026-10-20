@@ -15,6 +15,8 @@
 #include <sys/types.h> // ftruncate, fstat
 #include <unistd.h>    // ftruncate, fstat
 
+#include <cerrno>
+#include <cstdint>
 #include <limits>
 #include <string>
 #include <thread>
@@ -299,6 +301,56 @@ class HostSharedMemoryResource::impl {
 
     pthread_mutex_unlock(&m_segment->mutex);
     return ptr;
+  }
+
+  void release()
+  {
+    int err{0};
+    if ((err = pthread_mutex_lock(&m_segment->mutex)) != 0) {
+      UMPIRE_ERROR(runtime_error,
+                   fmt::format("Failed to lock mutex for shared memory segment {}: {}", m_segment_name, strerror(err)));
+    }
+
+    long page_size = ::sysconf(_SC_PAGESIZE);
+    if (page_size <= 0) {
+      page_size = 4096;
+    }
+
+    SharedMemoryBlock* block_ptr{nullptr};
+    offset_to_pointer(m_segment->free_blocks_off, block_ptr);
+
+    while (block_ptr != nullptr) {
+      char* const block_begin = reinterpret_cast<char*>(block_ptr);
+      char* const block_end = block_begin + block_ptr->block_size;
+
+      constexpr std::size_t keep_bytes = sizeof(SharedMemoryBlock);
+
+      std::uintptr_t begin = reinterpret_cast<std::uintptr_t>(block_begin + keep_bytes);
+      std::uintptr_t end = reinterpret_cast<std::uintptr_t>(block_end);
+
+      const std::uintptr_t ps = static_cast<std::uintptr_t>(page_size);
+
+      begin = (begin + ps - 1) & ~(ps - 1); // align up
+      end = end & ~(ps - 1);               // align down
+
+      if (end > begin) {
+        void* advise_ptr = reinterpret_cast<void*>(begin);
+        const std::size_t advise_len = static_cast<std::size_t>(end - begin);
+
+        if (::madvise(advise_ptr, advise_len, MADV_DONTNEED) != 0) {
+          int madvise_err = errno;
+          UMPIRE_LOG(Debug, "madvise(MADV_DONTNEED) failed for shared memory segment "
+                                << m_segment_name << ": " << strerror(madvise_err));
+        }
+      }
+
+      offset_to_pointer(block_ptr->next_block_off, block_ptr);
+    }
+
+    if ((err = pthread_mutex_unlock(&m_segment->mutex)) != 0) {
+      UMPIRE_ERROR(runtime_error, fmt::format("Failed to unlock mutex for shared memory segment {}: {}", m_segment_name,
+                                              strerror(err)));
+    }
   }
 
   std::size_t getActualSize() const noexcept

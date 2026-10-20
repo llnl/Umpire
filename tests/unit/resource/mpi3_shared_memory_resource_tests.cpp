@@ -5,6 +5,8 @@
 // SPDX-License-Identifier: (MIT)
 //////////////////////////////////////////////////////////////////////////////
 
+#include <exception>
+
 #include "gtest/gtest.h"
 #include "mpi.h"
 #include "umpire/Umpire.hpp"
@@ -87,6 +89,56 @@ TEST_F(MPISharedMemoryTest, SharedMemoryVisibility)
   }
   MPI_Barrier(shared_allocator_comm);
 }
+
+#if defined(__linux__)
+TEST(MPISharedMemorySocket, SharedMemoryAllocationAndCommunicator)
+{
+  auto& rm = umpire::ResourceManager::getInstance();
+  auto traits = umpire::get_default_resource_traits("SHARED::MPI3");
+  traits.scope = umpire::MemoryResourceTraits::shared_scope::socket;
+  traits.size = 1 * 1024 * 1024;
+
+  std::string reason;
+  if (!umpire::can_use_socket_scoped_mpi3_shared_memory(MPI_COMM_WORLD, reason)) {
+    GTEST_SKIP() << reason;
+  }
+
+  umpire::Allocator allocator;
+  try {
+    allocator = rm.makeResource("SHARED::MPI3::socket_allocator", traits);
+  } catch (const std::exception& e) {
+    GTEST_SKIP() << "Socket-scoped MPI3 shared memory requires ranks bound to a single socket (" << e.what() << ")";
+  }
+
+  auto comm = umpire::get_communicator_for_allocator(allocator, MPI_COMM_WORLD);
+  ASSERT_NE(comm, MPI_COMM_NULL);
+
+  auto cached_comm = umpire::get_communicator_for_allocator(allocator, MPI_COMM_WORLD);
+  int compare_result{MPI_UNEQUAL};
+  MPI_Comm_compare(comm, cached_comm, &compare_result);
+  ASSERT_EQ(compare_result, MPI_IDENT);
+
+  int rank{0};
+  int nranks{0};
+  MPI_Comm_rank(comm, &rank);
+  MPI_Comm_size(comm, &nranks);
+
+  auto socket_data = static_cast<int*>(allocator.allocate(2 * sizeof(int)));
+  ASSERT_NE(socket_data, nullptr);
+
+  if (rank == 0) {
+    socket_data[0] = 42;
+    socket_data[1] = nranks;
+  }
+
+  MPI_Barrier(comm);
+
+  ASSERT_EQ(socket_data[0], 42);
+  ASSERT_EQ(socket_data[1], nranks);
+
+  allocator.deallocate(socket_data);
+}
+#endif
 
 int main(int argc, char* argv[])
 {

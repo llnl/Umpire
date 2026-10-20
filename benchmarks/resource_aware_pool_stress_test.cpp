@@ -40,7 +40,7 @@ __device__ void sleep(clock_value_t sleep_cycles)
 __global__ void do_sleep()
 {
   // Sleep in kernel in order to replicate data race
-  sleep(100000000);
+  sleep((clock_value_t)100000000);
 }
 
 __global__ void touch_data(double* data)

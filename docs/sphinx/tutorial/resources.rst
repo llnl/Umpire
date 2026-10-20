@@ -35,6 +35,21 @@ example:
    :end-before: _sphinx_tag_tut_get_allocator_end
    :language: C++
 
+If you would prefer to avoid exceptions when an allocator is not available,
+you can instead use :func:`umpire::ResourceManager::tryGetAllocator`, which
+returns a ``std::optional<umpire::Allocator>`` that is empty when the
+requested allocator cannot be found:
+
+.. code-block:: cpp
+
+  auto& rm = umpire::ResourceManager::getInstance();
+  auto maybe_allocator = rm.tryGetAllocator("HOST");
+
+  if (maybe_allocator) {
+    auto allocator = *maybe_allocator;
+    // use allocator
+  }
+
 Note that since every allocator supports the same calls, no matter which resource 
 it is for, this means we can run the same code for all the resources available in
 the system.

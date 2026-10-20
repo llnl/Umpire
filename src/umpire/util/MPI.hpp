@@ -7,6 +7,8 @@
 #ifndef UMPIRE_MPI_HPP
 #define UMPIRE_MPI_HPP
 
+#include <string>
+
 #include "umpire/config.hpp"
 
 #if defined(UMPIRE_ENABLE_MPI)
@@ -15,6 +17,12 @@
 
 namespace umpire {
 namespace util {
+
+#if defined(UMPIRE_ENABLE_MPI)
+std::string get_mpi_error_message(int error_code);
+
+void check_mpi_call(int error_code, const char* call_name);
+#endif
 
 class MPI {
  public:

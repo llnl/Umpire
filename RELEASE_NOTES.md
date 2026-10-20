@@ -1,3 +1,44 @@
+# v2026.07.2
+
+## Bug Fixes
+
+- `get_communicator_for_allocator()` now works regardless of whether the shared memory allocator is wrapped or not
+
+# v2026.07.1
+
+## Changes Impacting Builds
+
+- Resolved errors related to exporting the legacy umpire CMake target.
+
+# v2026.07.0
+
+## Improvements
+
+- A list of available allocators is output if the requested allocator is not found
+
+## Changes Impacting Builds
+
+- Updated the exported CMake target name to `umpire::umpire`. The legacy `umpire` target is deprecated, 
+  but remains available when configured with UMPIRE_ENABLE_LEGACY_CMAKE_TARGETS=ON
+
+- Umpire now requires C++20
+
+## New Features
+
+- Added a tryGetAllocator which can be used to return an optional `umpire::Allocator`
+
+- Added an IPC Shared Memory Release function to return memory back to system
+
+- Added a `destroyAllocator` method which frees any resources owned by that Allocator
+
+- Added a MPI3 Shared Memory trait for socket scope
+
+- Added a utility function that returns the available memory on node
+
+## Bug Fixes
+
+- Fixed a small memory leak affecting touched unused pages
+
 # v2025.12.0
 
 ## Improvements

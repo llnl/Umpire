@@ -120,3 +120,25 @@ endif()
 blt_add_test(
   NAME version_fortran_tests
   COMMAND version_fortran_tests)
+
+blt_add_executable(
+  NAME aligned_pool_fortran_tests
+  SOURCES aligned_pool_fortran_tests.F
+  DEFINES ${fortran_test_defines}
+  DEPENDS_ON ${fortran_tests_depends})
+
+if (Fortran_COMPILER_FAMILY_IS_CLANG)
+  set_source_files_properties(
+    aligned_pool_fortran_tests.F
+    PROPERTIES
+    COMPILE_FLAGS -Mfree)
+else()
+  set_source_files_properties(
+    aligned_pool_fortran_tests.F
+    PROPERTIES
+    Fortran_FORMAT FREE)
+endif()
+
+blt_add_test(
+  NAME aligned_pool_fortran_tests
+  COMMAND aligned_pool_fortran_tests)

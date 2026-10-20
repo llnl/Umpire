@@ -27,6 +27,28 @@ int MPI::s_mpi_init_called = 0;
 MPI_Comm MPI::s_communicator = MPI_COMM_NULL;
 #endif
 
+#if defined(UMPIRE_ENABLE_MPI)
+std::string get_mpi_error_message(int error_code)
+{
+  char buffer[MPI_MAX_ERROR_STRING];
+  int length{0};
+  const int status = MPI_Error_string(error_code, buffer, &length);
+
+  if (status != MPI_SUCCESS) {
+    return fmt::format("MPI error code {} (MPI_Error_string failed with code {})", error_code, status);
+  }
+
+  return std::string{buffer, static_cast<std::size_t>(length)};
+}
+
+void check_mpi_call(int error_code, const char* call_name)
+{
+  if (error_code != MPI_SUCCESS) {
+    UMPIRE_ERROR(runtime_error, fmt::format("{} failed: {}", call_name, get_mpi_error_message(error_code)));
+  }
+}
+#endif
+
 void MPI::initialize(
 #if defined(UMPIRE_ENABLE_MPI)
     MPI_Comm comm

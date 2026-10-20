@@ -27,6 +27,7 @@ struct deallocate_resource;
 class json_file_store : public event_store {
  public:
   json_file_store(const std::string& filename, bool read_only = false);
+  ~json_file_store();
 
   virtual void insert(const event& e);
   virtual void insert(const allocate& e);
@@ -38,7 +39,6 @@ class json_file_store : public event_store {
   virtual std::vector<event> get_events();
 
  private:
-  void open_store();
   FILE* m_fstream{nullptr};
   std::string m_filename;
   bool m_read_only;

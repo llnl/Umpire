@@ -10,6 +10,7 @@
 #include <list>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -66,6 +67,14 @@ class ResourceManager {
    * \brief Get the Allocator with the given name.
    */
   Allocator getAllocator(const std::string& name);
+
+  /*!
+   * \brief Try to get the Allocator with the given name.
+   *
+   * This function returns an empty optional if the allocator does not exist
+   * or cannot be created, instead of throwing an exception.
+   */
+  std::optional<Allocator> tryGetAllocator(const std::string& name);
 
   Allocator getAllocator(const char* name);
 

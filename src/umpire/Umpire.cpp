@@ -8,6 +8,8 @@
 #include "umpire/Umpire.hpp"
 
 #include <algorithm>
+#include <cctype>
+#include <cstdio>
 #include <iostream>
 #include <iterator>
 #include <limits>
@@ -17,7 +19,12 @@
 
 #include "umpire/ResourceManager.hpp"
 #include "umpire/config.hpp"
+#if defined(UMPIRE_ENABLE_MPI3_SHARED_MEMORY)
+#include "umpire/resource/HostMpi3SharedMemoryResource.hpp"
+#endif
+#if defined(UMPIRE_ENABLE_IPC_SHARED_MEMORY)
 #include "umpire/resource/HostSharedMemoryResource.hpp"
+#endif
 #include "umpire/resource/MemoryResource.hpp"
 #if defined(UMPIRE_ENABLE_MPI) && defined(UMPIRE_ENABLE_IPC_SHARED_MEMORY)
 #if defined(UMPIRE_ENABLE_DEVICE)
@@ -172,6 +179,45 @@ std::size_t get_process_memory_usage()
 #endif
 }
 
+std::size_t get_mapping_memory_usage(const std::string& mapping_name)
+{
+#if defined(__linux__)
+  std::ifstream smaps{"/proc/self/smaps"};
+  if (!smaps) {
+    return 0;
+  }
+
+  std::size_t rss_kb{0};
+  bool in_target_mapping{false};
+  std::string line;
+
+  while (std::getline(smaps, line)) {
+    // Memory mapping header lines follow the format: "address-address perms ..."
+    // Check if line starts with hex digits and contains a hyphen in the first field
+    const bool is_header = (!line.empty() && std::isxdigit(static_cast<unsigned char>(line[0])) &&
+                            line.find('-') != std::string::npos && line.find('-') < 20);
+
+    if (is_header) {
+      in_target_mapping = (line.find(mapping_name) != std::string::npos);
+      continue;
+    }
+
+    if (!in_target_mapping || line.rfind("Rss:", 0) != 0) {
+      continue;
+    }
+
+    std::size_t value_kb{0};
+    std::sscanf(line.c_str(), "Rss: %zu kB", &value_kb);
+    rss_kb += value_kb;
+  }
+
+  return rss_kb * 1024;
+#else
+  UMPIRE_USE_VAR(mapping_name);
+  return 0;
+#endif
+}
+
 std::size_t get_internal_memory_usage()
 {
   return umpire::ResourceManager::getInstance().getInternalMemoryUsage();
@@ -314,10 +360,20 @@ std::map<int, MPI_Comm>& get_cached_communicators()
 
 MPI_Comm get_communicator_for_allocator(Allocator a, MPI_Comm comm)
 {
+  // Walk the strategy parent chain so that wrapping strategies (e.g.
+  // NamedAllocationStrategy, NamingShim) resolve to the communicator of the
+  // underlying shared-memory allocator.
+  for (auto strategy = a.getAllocationStrategy(); strategy != nullptr; strategy = strategy->getParent()) {
 #if defined(UMPIRE_ENABLE_IPC_SHARED_MEMORY) && defined(UMPIRE_ENABLE_DEVICE)
-  if (auto alloc = dynamic_cast<strategy::DeviceIpcAllocator*>(a.getAllocationStrategy()))
-    return alloc->get_scope_communicator();
+    if (auto alloc = dynamic_cast<umpire::strategy::DeviceIpcAllocator*>(strategy))
+      return alloc->get_scope_communicator();
 #endif
+#if defined(UMPIRE_ENABLE_MPI3_SHARED_MEMORY)
+    if (auto shared_resource = dynamic_cast<umpire::resource::HostMpi3SharedMemoryResource*>(strategy))
+      return shared_resource->getSharedCommunicator();
+#endif
+    UMPIRE_USE_VAR(strategy);
+  }
 
   std::map<int, MPI_Comm>& cached_communicators = get_cached_communicators();
 
@@ -345,10 +401,39 @@ void cleanup_cached_communicators()
   std::map<int, MPI_Comm>& comm = get_cached_communicators();
 
   for (auto c : comm) {
-    MPI_Comm_free(&c.second);
+    if (c.second != MPI_COMM_NULL) {
+      MPI_Comm_free(&c.second);
+    }
   }
 
   comm.clear();
+}
+#endif
+
+#if defined(UMPIRE_ENABLE_MPI)
+bool can_use_socket_scoped_mpi3_shared_memory(MPI_Comm comm, std::string& reason)
+{
+#if defined(UMPIRE_ENABLE_MPI3_SHARED_MEMORY)
+  const int local_affinity_valid = resource::affinity_maps_to_single_socket(reason) ? 1 : 0;
+  int all_affinity_valid{0};
+  const int status = MPI_Allreduce(&local_affinity_valid, &all_affinity_valid, 1, MPI_INT, MPI_MIN, comm);
+
+  if (status != MPI_SUCCESS) {
+    reason = fmt::format("MPI_Allreduce failed while checking socket affinity: {}",
+                         util::get_mpi_error_message(status));
+    return false;
+  }
+
+  if (!all_affinity_valid && local_affinity_valid) {
+    reason = "Another rank in the communicator does not map to a single socket";
+  }
+
+  return all_affinity_valid != 0;
+#else
+  UMPIRE_USE_VAR(comm);
+  reason = "MPI3 shared memory support is disabled";
+  return false;
+#endif
 }
 #endif
 

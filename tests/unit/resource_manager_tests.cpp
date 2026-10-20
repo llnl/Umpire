@@ -55,6 +55,21 @@ TEST(ResourceManager, getAllocatorByName)
   ASSERT_THROW(rm.getAllocator("BANANA"), umpire::runtime_error);
 }
 
+TEST(ResourceManager, getAllocatorByNameErrorListsAvailableAllocators)
+{
+  auto& rm = umpire::ResourceManager::getInstance();
+
+  try {
+    UMPIRE_USE_VAR(rm.getAllocator("BANANA"));
+    FAIL() << "Expected getAllocator to throw";
+  } catch (const umpire::runtime_error& e) {
+    const std::string message{e.what()};
+    EXPECT_NE(message.find("Available allocators:"), std::string::npos);
+    EXPECT_NE(message.find("\n  - HOST"), std::string::npos);
+    EXPECT_EQ(message.find("__umpire_internal_null"), std::string::npos);
+  }
+}
+
 TEST(ResourceManager, getAllocatorById)
 {
   auto& rm = umpire::ResourceManager::getInstance();

@@ -9,6 +9,8 @@
 #include <iterator>
 #include <memory>
 #include <sstream>
+#include <unordered_set>
+#include <algorithm>
 
 #include "umpire/Umpire.hpp"
 #include "umpire/config.hpp"
@@ -215,6 +217,29 @@ strategy::AllocationStrategy* ResourceManager::getAllocationStrategy(const std::
   }
 
   return m_allocators_by_name[name];
+}
+
+std::optional<Allocator> ResourceManager::tryGetAllocator(const std::string& name)
+{
+  UMPIRE_LOG(Debug, "(\"" << name << "\")");
+
+  resource::MemoryResourceRegistry& registry{resource::MemoryResourceRegistry::getInstance()};
+  auto resource_names = registry.getResourceNames();
+
+  auto allocator = m_allocators_by_name.find(name);
+  if (allocator == m_allocators_by_name.end()) {
+    auto resource_name = std::find(resource_names.begin(), resource_names.end(), name);
+    if (resource_name != std::end(resource_names)) {
+      makeResource(name);
+      allocator = m_allocators_by_name.find(name);
+    }
+  }
+
+  if (allocator == m_allocators_by_name.end()) {
+    return std::nullopt;
+  }
+
+  return Allocator{allocator->second};
 }
 
 Allocator ResourceManager::getAllocator(const std::string& name)
@@ -1101,9 +1126,38 @@ int ResourceManager::getNextId() noexcept
 std::string ResourceManager::getAllocatorInformation() const noexcept
 {
   std::ostringstream info;
+  std::unordered_set<std::string> seen_names;
+  bool has_names{false};
 
-  for (auto& it : m_allocators_by_name) {
-    info << *it.second << " ";
+  const auto append_name = [&](const std::string& name) {
+    if (name == s_null_resource_name || name == s_zero_byte_pool_name) {
+      return;
+    }
+
+    if (seen_names.insert(name).second) {
+      info << "\n  - " << name;
+      has_names = true;
+    }
+  };
+
+  for (const auto& name : resource::MemoryResourceRegistry::getInstance().getResourceNames()) {
+    append_name(name);
+  }
+
+  std::vector<std::string> extra_names;
+  extra_names.reserve(m_allocators_by_name.size());
+
+  for (const auto& it : m_allocators_by_name) {
+    extra_names.push_back(it.first);
+  }
+
+  std::sort(extra_names.begin(), extra_names.end());
+  for (const auto& name : extra_names) {
+    append_name(name);
+  }
+
+  if (!has_names) {
+    info << " (none)";
   }
 
   return info.str();

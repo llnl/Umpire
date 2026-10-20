@@ -13,6 +13,7 @@
 TEST(Umpire, ProcessorMemoryStatistics)
 {
   ASSERT_GE(umpire::get_process_memory_usage(), 0);
+  ASSERT_GE(umpire::get_mapping_memory_usage(""), 0);
   ASSERT_GE(umpire::get_device_memory_usage(0), 0);
 }
 

@@ -152,6 +152,22 @@ std::string get_backtrace(void* ptr);
 std::size_t get_process_memory_usage();
 
 /*!
+ * \brief Get resident memory usage for memory mappings whose name contains
+ * the provided substring.
+ *
+ * On Linux, this uses /proc/self/smaps and sums the RSS values for all mappings
+ * whose name field contains the provided substring. The matching is case-sensitive
+ * and uses substring matching (not exact matching), so providing "POSIX" will match
+ * any mapping path containing "POSIX" anywhere in its name.
+ *
+ * Returns 0 on unsupported platforms or if no matching mappings are found.
+ *
+ * \param mapping_name Substring to search for in mapping names (case-sensitive)
+ * \return Total RSS in bytes for all matching mappings, or 0 if none found
+ */
+std::size_t get_mapping_memory_usage(const std::string& mapping_name);
+
+/*!
  * \brief Get high watermark memory usage of the current process (uses underlying
  * system-dependent calls)
  */
@@ -202,6 +218,20 @@ void* find_pointer_from_name(Allocator allocator, const std::string& name);
  */
 MPI_Comm get_communicator_for_allocator(Allocator a, MPI_Comm comm);
 void cleanup_cached_communicators();
+#endif
+
+#if defined(UMPIRE_ENABLE_MPI)
+/*!
+ * \brief Collective preflight check for socket-scoped MPI3 shared memory.
+ *
+ * All ranks in \p comm must call this function.
+ *
+ * \param comm MPI communicator to check.
+ * \param reason Failure reason when the check returns false.
+ *
+ * \return true when every rank in \p comm is bound to one socket.
+ */
+bool can_use_socket_scoped_mpi3_shared_memory(MPI_Comm comm, std::string& reason);
 #endif
 
 void register_external_allocation(void* ptr, util::AllocationRecord record);

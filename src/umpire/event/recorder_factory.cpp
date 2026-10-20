@@ -19,6 +19,7 @@
 #include "umpire/event/json_file_store.hpp"
 #endif // UMPIRE_ENABLE_SQLITE_EXPERIMENTAL
 
+#include "umpire/util/Macros.hpp"
 #include "umpire/util/io.hpp"
 
 #if !defined(_MSC_VER)
@@ -45,6 +46,18 @@ store_type& recorder_factory::get_recorder()
   static json_file_store db{filename};
 #endif // UMPIRE_ENABLE_SQLITE_EXPERIMENTAL
   static event_store_recorder recorder(&db);
+
+  static bool info_logged = false;
+  if (!info_logged) {
+    const char* replay_env = std::getenv("UMPIRE_REPLAY");
+    const char* event_env = std::getenv("UMPIRE_EVENTS");
+    if (replay_env != nullptr || event_env != nullptr) {
+      UMPIRE_LOG(Info,
+                 "Event recording enabled via environment variables. "
+                 "Note: Variables must be set before program execution.");
+    }
+    info_logged = true;
+  }
 
   return recorder;
 }

@@ -230,6 +230,18 @@ TEST(Allocator, registerAllocator)
   ASSERT_FALSE(rm.isAllocator("BANANAS"));
 }
 
+TEST(Allocator, TryGetAllocator)
+{
+  auto& rm = umpire::ResourceManager::getInstance();
+
+  auto host_allocator = rm.tryGetAllocator("HOST");
+  ASSERT_TRUE(host_allocator.has_value());
+  EXPECT_EQ(std::string{"HOST"}, host_allocator->getName());
+
+  auto bad_allocator = rm.tryGetAllocator("BANANAS");
+  EXPECT_FALSE(bad_allocator.has_value());
+}
+
 TEST(Allocator, GetSetDefault)
 {
   auto& rm = umpire::ResourceManager::getInstance();

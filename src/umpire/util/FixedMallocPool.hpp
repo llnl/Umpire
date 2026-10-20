@@ -46,9 +46,9 @@ class FixedMallocPool {
  private:
   struct Pool {
     unsigned char* data;
-    unsigned char* next;
-    unsigned int num_initialized;
-    std::size_t num_free;
+    unsigned int free_list;  // index of first recycled slot; linked through the
+                             // slots' own storage, objects_per_pool = end of list
+    unsigned int num_used;   // high-water mark: slots ever handed out
     Pool(const std::size_t object_bytes, const std::size_t objects_per_pool);
   };
 

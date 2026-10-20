@@ -23,4 +23,4 @@ if(NOT TARGET fmt::fmt)
 endif()
 
 add_executable(using-with-cmake using-with-cmake.cpp)
-target_link_libraries(using-with-cmake umpire fmt::fmt)
+target_link_libraries(using-with-cmake umpire::umpire fmt::fmt)

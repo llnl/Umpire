@@ -1,8 +1,10 @@
-on: 
+on:
+  workflow_dispatch:
   pull_request:
     paths:
       - '**umpire_shroud.yaml'
       - '**genfumpiresplicer.f'
+      - '**gencumpiresplicer.inc'
 
 name: Generate C/FORTRAN Interface
 jobs:

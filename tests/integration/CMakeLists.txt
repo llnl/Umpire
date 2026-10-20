@@ -281,7 +281,7 @@ blt_add_test(
 set_property(TEST destroy_allocator_strict_mode_tests
   PROPERTY ENVIRONMENT "UMPIRE_STRICT_DESTRUCTION=1")
 
-if (UMPIRE_ENABLE_IPC_SHARED_MEMORY AND UMPIRE_ENABLE_MPI)
+if (UMPIRE_ENABLE_MPI AND (UMPIRE_ENABLE_IPC_SHARED_MEMORY OR UMPIRE_ENABLE_MPI3_SHARED_MEMORY))
   blt_add_executable(
     NAME get_communicator_tests
     SOURCES get_communicator_tests.cpp

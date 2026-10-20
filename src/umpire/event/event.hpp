@@ -47,7 +47,7 @@ inline std::string to_string(const camp::resources::Resource& r)
       return "camp::resource::Undefined";
   }
 
-  return "unkown resource";
+  return "unknown resource";
 }
 
 } // namespace v1

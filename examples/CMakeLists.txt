@@ -22,6 +22,14 @@ if (UMPIRE_ENABLE_MPI3_SHARED_MEMORY)
   endif()
 endif()
 
+if (UMPIRE_ENABLE_IPC_SHARED_MEMORY)
+  blt_add_executable(
+    NAME ipc_shared_memory_release
+    SOURCES ipc_shared_memory_release.cpp
+    DEPENDS_ON ${example_depends})
+  list(APPEND umpire_examples ipc_shared_memory_release)
+endif()
+
 blt_add_executable(
   NAME aligned_allocator
   SOURCES aligned_allocator.cpp

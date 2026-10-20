@@ -27,9 +27,9 @@ variables:
   PROJECT_DANE_DEPS: ""
 
   # Matrix (SLURM) allocation settings
-  MATRIX_SHARED_ALLOC: "--exclusive --partition=pci --time=10 --nodes=1"
-  # Note: We repeat the reservation, helpful when jobs are manually re-triggered.
-  MATRIX_JOB_ALLOC: "--partition=pci --overlap --nodes=1"
+  MATRIX_SHARED_ALLOC: "OFF"
+  # Note: We repeat the reservation, necessary when jobs are manually re-triggered.
+  MATRIX_JOB_ALLOC: "--partition=pci --time=10 --gpus=1"
   # Project specific variants for matrix
   PROJECT_MATRIX_VARIANTS: "~shared +fortran +tools tests=basic +cuda cuda_arch=90"
   # Project specific deps for matrix

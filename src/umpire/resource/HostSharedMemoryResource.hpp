@@ -28,6 +28,16 @@ class HostSharedMemoryResource : public MemoryResource {
 
   void deallocate(void* ptr, std::size_t size) override;
 
+  /*!
+   * \brief Attempt to return unused shared memory pages to the OS.
+   *
+   * This resource uses a fixed-size POSIX shared memory segment and maintains
+   * free blocks internally. Calling release() will not change allocation
+   * semantics, but may allow the OS to reclaim pages that back free blocks so
+   * they can be reused by the system.
+   */
+  void release() override;
+
   std::size_t getActualSize() const noexcept override;
 
   bool isAccessibleFrom(Platform p) noexcept override;

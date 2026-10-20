@@ -64,6 +64,18 @@ point to the root of your Umpire installation, you can call
 ``find_package(umpire)`` inside your CMake project and Umpire will be
 automatically detected and available for use.
 
+When using Umpire in your CMake project, link against the namespaced target
+``umpire::umpire``:
+
+.. code-block:: cmake
+
+  find_package(umpire REQUIRED)
+  target_link_libraries(your_target umpire::umpire)
+
+For backwards compatibility, the non-namespaced target ``umpire`` is still
+available but deprecated. Using namespaced targets provides better error
+diagnostics when ``find_package()`` is missing.
+
 -----------
 Basic Usage
 -----------
