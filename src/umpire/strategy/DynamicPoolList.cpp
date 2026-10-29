@@ -138,16 +138,22 @@ void DynamicPoolList::coalesce() noexcept
 
 PoolCoalesceHeuristic<DynamicPoolList> DynamicPoolList::blocks_releasable(std::size_t nblocks)
 {
-  return [=](const strategy::DynamicPoolList& pool) {
-    return pool.getReleasableBlocks() >= nblocks ? pool.getActualSize() : 0;
-  };
+  return PoolCoalesceHeuristic<DynamicPoolList>::known(
+      [=](const strategy::DynamicPoolList& pool) {
+        return pool.getReleasableBlocks() >= nblocks ? pool.getActualSize() : 0;
+      },
+      PoolCoalesceHeuristic<DynamicPoolList>::Kind::blocks_releasable,
+      nblocks);
 }
 
 PoolCoalesceHeuristic<DynamicPoolList> DynamicPoolList::blocks_releasable_hwm(std::size_t nblocks)
 {
-  return [=](const strategy::DynamicPoolList& pool) {
-    return pool.getReleasableBlocks() >= nblocks ? pool.getAlignedHighwaterMark() : 0;
-  };
+  return PoolCoalesceHeuristic<DynamicPoolList>::known(
+      [=](const strategy::DynamicPoolList& pool) {
+        return pool.getReleasableBlocks() >= nblocks ? pool.getAlignedHighwaterMark() : 0;
+      },
+      PoolCoalesceHeuristic<DynamicPoolList>::Kind::blocks_releasable_hwm,
+      nblocks);
 }
 
 PoolCoalesceHeuristic<DynamicPoolList> DynamicPoolList::percent_releasable(int percentage)
@@ -158,16 +164,25 @@ PoolCoalesceHeuristic<DynamicPoolList> DynamicPoolList::percent_releasable(int p
   }
 
   if (percentage == 0) {
-    return [=](const DynamicPoolList& UMPIRE_UNUSED_ARG(pool)) { return 0; };
+    return PoolCoalesceHeuristic<DynamicPoolList>::known(
+        [=](const DynamicPoolList& UMPIRE_UNUSED_ARG(pool)) { return 0; },
+        PoolCoalesceHeuristic<DynamicPoolList>::Kind::percent_releasable,
+        percentage);
   } else if (percentage == 100) {
-    return [=](const strategy::DynamicPoolList& pool) { return pool.getCurrentSize() == 0 ? pool.getActualSize() : 0; };
+    return PoolCoalesceHeuristic<DynamicPoolList>::known(
+        [=](const strategy::DynamicPoolList& pool) { return pool.getCurrentSize() == 0 ? pool.getActualSize() : 0; },
+        PoolCoalesceHeuristic<DynamicPoolList>::Kind::percent_releasable,
+        percentage);
   } else {
     float f = (float)((float)percentage / (float)100.0);
-    return [=](const strategy::DynamicPoolList& pool) {
-      // Calculate threshold in bytes from the percentage
-      const std::size_t threshold = static_cast<std::size_t>(f * pool.getActualSize());
-      return pool.getReleasableSize() >= threshold ? pool.getActualSize() : 0;
-    };
+    return PoolCoalesceHeuristic<DynamicPoolList>::known(
+        [=](const strategy::DynamicPoolList& pool) {
+          // Calculate threshold in bytes from the percentage
+          const std::size_t threshold = static_cast<std::size_t>(f * pool.getActualSize());
+          return pool.getReleasableSize() >= threshold ? pool.getActualSize() : 0;
+        },
+        PoolCoalesceHeuristic<DynamicPoolList>::Kind::percent_releasable,
+        percentage);
   }
 }
 
@@ -179,18 +194,27 @@ PoolCoalesceHeuristic<DynamicPoolList> DynamicPoolList::percent_releasable_hwm(i
   }
 
   if (percentage == 0) {
-    return [=](const DynamicPoolList& UMPIRE_UNUSED_ARG(pool)) { return 0; };
+    return PoolCoalesceHeuristic<DynamicPoolList>::known(
+        [=](const DynamicPoolList& UMPIRE_UNUSED_ARG(pool)) { return 0; },
+        PoolCoalesceHeuristic<DynamicPoolList>::Kind::percent_releasable_hwm,
+        percentage);
   } else if (percentage == 100) {
-    return [=](const strategy::DynamicPoolList& pool) {
-      return pool.getCurrentSize() == 0 ? pool.getAlignedHighwaterMark() : 0;
-    };
+    return PoolCoalesceHeuristic<DynamicPoolList>::known(
+        [=](const strategy::DynamicPoolList& pool) {
+          return pool.getCurrentSize() == 0 ? pool.getAlignedHighwaterMark() : 0;
+        },
+        PoolCoalesceHeuristic<DynamicPoolList>::Kind::percent_releasable_hwm,
+        percentage);
   } else {
     float f = (float)((float)percentage / (float)100.0);
-    return [=](const strategy::DynamicPoolList& pool) {
-      // Calculate threshold in bytes from the percentage
-      const std::size_t threshold = static_cast<std::size_t>(f * pool.getActualSize());
-      return pool.getReleasableSize() >= threshold ? pool.getAlignedHighwaterMark() : 0;
-    };
+    return PoolCoalesceHeuristic<DynamicPoolList>::known(
+        [=](const strategy::DynamicPoolList& pool) {
+          // Calculate threshold in bytes from the percentage
+          const std::size_t threshold = static_cast<std::size_t>(f * pool.getActualSize());
+          return pool.getReleasableSize() >= threshold ? pool.getAlignedHighwaterMark() : 0;
+        },
+        PoolCoalesceHeuristic<DynamicPoolList>::Kind::percent_releasable_hwm,
+        percentage);
   }
 }
 

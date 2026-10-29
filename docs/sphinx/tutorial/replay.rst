@@ -3,15 +3,17 @@
 ======
 Replay
 ======
-Umpire provides a lightweight replay capability that can be used to investigate
-performance of particular allocation patterns and reproduce bugs.
+Umpire provides a replay capability for reproducing allocator behavior and
+debugging Umpire issues independent of the original application.
 
 Input Example
 -------------
-When replay is enabled, Umpire captures replay events and writes them as
-JSON-formatted lines into a ``.stats`` file. This file can be used as input to
-the ``replay`` application (available under the ``bin`` directory), which will
-recreate the events that occurred as part of the run that generated the log.
+When replay is enabled, Umpire writes replay-v2 JSONL into a ``.stats`` file.
+The first line is a header and each later line is an operation record with a
+``pending`` or ``committed`` lifecycle status. This file can be used as input
+to the ``replay`` application (available under the ``bin`` directory), which
+reconstructs committed allocator creation, allocation, and deallocation
+activity from the recorded trace.
 
 The file ``tut_replay.cpp`` makes a :class:`umpire::strategy::QuickPool`:
 
@@ -41,16 +43,29 @@ Running this program:
 
    UMPIRE_REPLAY="On" ./bin/examples/tutorial/tut_replay
 
-will write Umpire replay events to a file with a name like
+will write replay output to a file with a name like
 ``umpire.<pid>.<uid>.stats`` in the current directory (or in the directory
-specified by ``UMPIRE_OUTPUT_DIR``). This file contains JSON formatted lines.
+specified by ``UMPIRE_OUTPUT_DIR``). A minimal example looks like:
+
+.. literalinclude:: ../../../examples/tutorial/tut_replay_log.json
+   :start-after: _sphinx_tag_doc_header_start
+   :end-before: _sphinx_tag_doc_deallocate_end
+   :language: json
 
 Replaying the session
 ---------------------
 Loading this ``.stats`` file with the ``replay`` program will replay this
-sequence of :class:`umpire::Allocator` creation, allocations, and
+committed sequence of :class:`umpire::Allocator` creation, allocations, and
 deallocations:
 
 .. code-block:: bash
 
    ./bin/replay -i umpire.<pid>.<uid>.stats
+
+To also generate a ULTRA trace from the replayed allocator state:
+
+.. code-block:: bash
+
+   ./bin/replay -d -i umpire.<pid>.<uid>.stats
+
+This writes ``replay<PID>.ult`` in the working directory.

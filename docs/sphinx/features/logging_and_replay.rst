@@ -1,39 +1,45 @@
 .. _logging_and_replay:
 
 ===================================
-Logging and Replay of Umpire Events            
+Logging and Replay of Umpire Events
 ===================================
 
 Logging
 -------
 When debugging memory operation problems, it is sometimes helpful to enable
-Umpire's logging facility.  The logging functionality is enabled for default
-builds unless ``-DUMPIRE_ENABLE_LOGGING=Off`` has been specified in which case it is
-disabled.
+Umpire's logging facility. The logging functionality is enabled for default
+builds unless ``-DUMPIRE_ENABLE_LOGGING=Off`` has been specified, in which case
+it is disabled.
 
 If Umpire logging is enabled, it may be controlled by setting the
 ``UMPIRE_LOG_LEVEL`` environment variable to ``Error``, ``Warning``, ``Info``,
-or ``Debug``.  The ``Debug`` value is the most verbose.
+or ``Debug``. The ``Debug`` value is the most verbose.
 
 When ``UMPIRE_LOG_LEVEL`` has been set, events will be logged to the standard
 output.
 
 Replay
--------
-Umpire provides a lightweight replay capability that can be used to investigate
-performance of particular allocation patterns and reproduce bugs. By running an
-executable that uses Umpire with the environment variable ``UMPIRE_REPLAY`` set
-to ``On``, Umpire will emit information for the following Umpire events:
+------
+Umpire provides a replay capability that is focused on reproducibility. By
+running an executable that uses Umpire with the environment variable
+``UMPIRE_REPLAY`` set to ``On``, Umpire will emit a replay-v2 trace that can be
+used later to recreate allocator construction, allocations, and deallocations
+independent of the original application.
 
-- **version**
-  :func:`umpire::get_major_version`,
-  :func:`umpire::get_minor_version`,
-  and :func:`umpire::get_patch_version`
-- **makeMemoryResource**
-  :func:`umpire::resource::MemoryResourceRegistry::makeMemoryResource`
-- **makeAllocator** :func:`umpire::ResourceManager::makeAllocator`
-- **allocate** :func:`umpire::Allocator::allocate`
-- **deallocate** :func:`umpire::Allocator::deallocate`
+Replay-v2 records attempted calls to:
+
+- built-in memory resource construction, serialized as ``make_allocator`` with
+  ``strategy`` set to ``MemoryResource``
+- :func:`umpire::ResourceManager::makeAllocator`
+- :func:`umpire::Allocator::allocate`
+- :func:`umpire::Allocator::deallocate`
+
+The output is newline-delimited JSON. The first line is a header that
+identifies the schema version. Each later line is a replay command. Successful
+operations are recorded as a lightweight two-line lifecycle: a ``pending``
+record written before execution and a ``committed`` record written after
+success. If the process fails during an operation, the trace may end with a
+trailing ``pending`` record.
 
 Running with Replay
 -------------------
@@ -43,96 +49,101 @@ To enable Umpire replay, one may execute as follows:
 
    UMPIRE_REPLAY="On" ./my_umpire_using_program
 
-will write Umpire replay events to a file with a name like
+This will write replay output to a file with a name like
 ``umpire.<pid>.<uid>.stats`` in the directory specified by
-``UMPIRE_OUTPUT_DIR`` (or in the current directory if it is not set). The
-resulting ``.stats`` file contains JSON-formatted lines with the following
-kinds of information:
+``UMPIRE_OUTPUT_DIR`` (or in the current directory if it is not set).
 
-Interpretting Results - Version Event
--------------------------------------
-The first event captured is the **version** event which shows the version
-information. The example below is taken from the file
-``examples/tutorial/tut_replay_log.json``, which contains the contents of a
-replay ``.stats`` file in JSON format:
+Interpreting Results - Header
+-----------------------------
+The first line in the trace is a replay header. The example below is taken from
+``examples/tutorial/tut_replay_log.json``:
 
 .. literalinclude:: ../../../examples/tutorial/tut_replay_log.json
-   :start-after: _sphinx_tag_doc_version_start
-   :end-before: _sphinx_tag_doc_version_end
+   :start-after: _sphinx_tag_doc_header_start
+   :end-before: _sphinx_tag_doc_header_end
    :language: json
 
-Each line contains the following set of common elements:
+The header contains:
 
 **kind**
-  Always set to ``replay``
+  Always set to ``umpire_replay``
 
-**uid**
-  This is the MPI rank of the process generating the event for
-  mpi programs or the PID for non-mpi.
+**schema**
+  The replay schema version. The current format is ``v2``.
 
-**timestamp**
-  Set to the time when the event occurred.
+**process**
+  Metadata about the process that generated the trace. This includes the OS
+  process ID and the MPI rank when MPI is enabled.
 
-**event**
-  Set to one of: ``version``, ``makeMemoryResource``,
-  ``makeAllocator``, ``allocate``, or ``deallocate``
-
-**payload**
-  Optional and varies upon event type
-
-**result**
-  Optional and varies upon event type
-
-As can be seen, the *major*, *minor*, and *patch* version numbers are captured
-within the *payload* for this event.
+**umpire_version**
+  The Umpire version that produced the replay trace.
 
 makeMemoryResource Event
 ------------------------
-Next you will see events for the creation of the default memory resources
-provided by Umpire with the **makeMemoryResource** event:
+Built-in memory resources are recorded as ``make_allocator`` commands using the
+``MemoryResource`` strategy:
 
 .. literalinclude:: ../../../examples/tutorial/tut_replay_log.json
    :start-after: _sphinx_tag_doc_makememoryresource_start
    :end-before: _sphinx_tag_doc_makememoryresource_end
    :language: json
 
-The *payload* shows that a memory resource was created for *HOST*, *DEVICE*,
-*PINNED*, *UM*, and *DEVICE_CONST* respectively. Note that this could also
-be done with the *FILE* memory resource. The *result* is a reference
-to the object that was created within Umpire for that resource.
+The command includes:
+
+**seq**
+  A monotonically increasing sequence number used to preserve operation order.
+
+**allocator_id**
+  A stable allocator identity within the trace.
+
+**name**
+  The allocator or resource name that will be visible through the
+  :class:`umpire::Allocator`.
+
+**strategy**
+  ``MemoryResource`` for built-in memory resources.
+
+**tracking**
+  Whether the allocator was created with tracking enabled.
+
+**args**
+  Constructor arguments. For memory resources this includes the
+  ``resource_name`` and serialized :class:`umpire::MemoryResourceTraits`.
+
+**status**
+  ``pending`` before execution and ``committed`` after success.
 
 makeAllocator Event
 -------------------
-The **makeAllocator** event occurs whenever a new allocator instance is being
-created.  Each call to **makeAllocator** will generate a pair of JSON lines.  The
-first line will show the intent of the call and the second line will show both
-the intent and the result.  This is because the makeAllocator call can fail
-and keeping both the intent and result allows us to reproduce this failure
-later.
-
-:class:`umpire::Allocator`:
+Each call to :func:`umpire::ResourceManager::makeAllocator` records a
+``pending`` command before execution and, on success, a matching
+``committed`` command. The example below shows a
+:class:`umpire::strategy::QuickPool` construction:
 
 .. literalinclude:: ../../../examples/tutorial/tut_replay_log.json
    :start-after: _sphinx_tag_doc_makeallocator_start
    :end-before: _sphinx_tag_doc_makeallocator_end
    :language: json
 
-The *payload* shows how the allocator was constructed.  The *result* shows the
-reference to the allocated object.
+The ``args`` object contains the serialized constructor arguments for the
+strategy. In this example, ``parent_allocator`` refers back to the previously
+constructed ``HOST`` resource by allocator ID, and the pool parameters are
+recorded explicitly so that replay can rebuild the same allocator.
 
 allocate Event
 --------------
-Like the **makeAllocator** event, the **allocate** event is captured as an
-intention/result pair so that an error may be replayed in the event that
-there is an allocation failure.
+Each allocation attempt records a ``pending`` command and, on success, a
+matching ``committed`` command with the allocator used, a stable allocation
+ID, and the requested allocation size:
 
 .. literalinclude:: ../../../examples/tutorial/tut_replay_log.json
    :start-after: _sphinx_tag_doc_allocate_start
    :end-before: _sphinx_tag_doc_allocate_end
    :language: json
 
-The *payload* shows the object reference of the allocator and the size of the
-allocation request.  The *result* shows the pointer to the memory allocated.
+Replay uses ``allocation_id`` rather than the original process pointer value.
+This keeps the trace stable across runs while still preserving allocation
+lifetime.
 
 deallocate Event
 ----------------
@@ -141,15 +152,26 @@ deallocate Event
    :end-before: _sphinx_tag_doc_deallocate_end
    :language: json
 
-The *payload* shows the reference to the allocator object and the pointer
-to the allocated memory that is to be freed.
+The ``deallocate`` command uses the same ``pending``/``committed`` lifecycle
+and references the same ``allocator_id`` and ``allocation_id`` so that the
+replay runtime can free the correct allocation.
 
 Replaying the session
 ---------------------
-Loading the ``.stats`` file with the ``replay`` program will replay this
-sequence of :class:`umpire::Allocator` creation, allocations, and
-deallocations:
+Loading the ``.stats`` file with the ``replay`` program will replay the
+committed subset of this sequence of :class:`umpire::Allocator` creation,
+allocations, and deallocations. Trailing ``pending`` records are preserved as
+failure evidence but are not executed.
 
 .. code-block:: bash
 
    ./bin/replay -i umpire.<pid>.<uid>.stats
+
+To emit a ULTRA trace from the replayed allocator state, use:
+
+.. code-block:: bash
+
+   ./bin/replay -d -i umpire.<pid>.<uid>.stats
+
+This writes ``replay<PID>.ult`` with allocator statistics sampled after each
+replay command. That file can be visualized with ULTRA tooling.

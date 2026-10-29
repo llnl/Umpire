@@ -71,7 +71,7 @@ static const char* event_env{std::getenv("UMPIRE_EVENTS")};
 #endif
 static const bool enable_replay{(replay_env != NULL)};
 static const bool enable_event{(event_env != NULL)};
-static const bool event_build_enabled{enable_replay || enable_event};
+static const bool event_build_enabled{enable_event};
 } // namespace
 
 enum class category { operation, statistic, metadata };

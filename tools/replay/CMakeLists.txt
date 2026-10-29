@@ -12,17 +12,13 @@ if (UMPIRE_ENABLE_BACKTRACE_SYMBOLS)
 endif()
 
 set(replay_headers
+  ReplayConstructorRegistry.hpp
   ReplayInterpreter.hpp
-  ReplayInterpreter.inl
-  ReplayMacros.hpp
-  ReplayOperationManager.hpp
-  ReplayOptions.hpp
-  ReplayFile.hpp)
+  ReplayOptions.hpp)
 
 set(replay_sources
-  ReplayInterpreter.cpp
-  ReplayOperationManager.cpp
-  ReplayFile.cpp)
+  ReplayConstructorRegistry.cpp
+  ReplayInterpreter.cpp)
 
 blt_add_executable(
   NAME replay

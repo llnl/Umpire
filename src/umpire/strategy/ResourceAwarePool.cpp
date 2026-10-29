@@ -504,16 +504,22 @@ void ResourceAwarePool::do_coalesce(std::size_t suggested_size) noexcept
 
 PoolCoalesceHeuristic<ResourceAwarePool> ResourceAwarePool::blocks_releasable(std::size_t nblocks)
 {
-  return [=](const strategy::ResourceAwarePool& pool) {
-    return pool.getReleasableBlocks() >= nblocks ? pool.getActualSize() : 0;
-  };
+  return PoolCoalesceHeuristic<ResourceAwarePool>::known(
+      [=](const strategy::ResourceAwarePool& pool) {
+        return pool.getReleasableBlocks() >= nblocks ? pool.getActualSize() : 0;
+      },
+      PoolCoalesceHeuristic<ResourceAwarePool>::Kind::blocks_releasable,
+      nblocks);
 }
 
 PoolCoalesceHeuristic<ResourceAwarePool> ResourceAwarePool::blocks_releasable_hwm(std::size_t nblocks)
 {
-  return [=](const strategy::ResourceAwarePool& pool) {
-    return pool.getReleasableBlocks() >= nblocks ? pool.getAlignedHighwaterMark() : 0;
-  };
+  return PoolCoalesceHeuristic<ResourceAwarePool>::known(
+      [=](const strategy::ResourceAwarePool& pool) {
+        return pool.getReleasableBlocks() >= nblocks ? pool.getAlignedHighwaterMark() : 0;
+      },
+      PoolCoalesceHeuristic<ResourceAwarePool>::Kind::blocks_releasable_hwm,
+      nblocks);
 }
 
 PoolCoalesceHeuristic<ResourceAwarePool> ResourceAwarePool::percent_releasable(int percentage)
@@ -523,18 +529,27 @@ PoolCoalesceHeuristic<ResourceAwarePool> ResourceAwarePool::percent_releasable(i
                  fmt::format("Invalid percentage: {}, percentage must be an integer between 0 and 100", percentage));
   }
   if (percentage == 0) {
-    return [=](const ResourceAwarePool& UMPIRE_UNUSED_ARG(pool)) { return 0; };
+    return PoolCoalesceHeuristic<ResourceAwarePool>::known(
+        [=](const ResourceAwarePool& UMPIRE_UNUSED_ARG(pool)) { return 0; },
+        PoolCoalesceHeuristic<ResourceAwarePool>::Kind::percent_releasable,
+        percentage);
   } else if (percentage == 100) {
-    return [=](const strategy::ResourceAwarePool& pool) {
-      return pool.getActualSize() == pool.getReleasableSize() ? pool.getActualSize() : 0;
-    };
+    return PoolCoalesceHeuristic<ResourceAwarePool>::known(
+        [=](const strategy::ResourceAwarePool& pool) {
+          return pool.getActualSize() == pool.getReleasableSize() ? pool.getActualSize() : 0;
+        },
+        PoolCoalesceHeuristic<ResourceAwarePool>::Kind::percent_releasable,
+        percentage);
   } else {
     float f = (float)((float)percentage / (float)100.0);
-    return [=](const strategy::ResourceAwarePool& pool) {
-      // Calculate threshold in bytes from the percentage
-      const std::size_t threshold = static_cast<std::size_t>(f * pool.getActualSize());
-      return pool.getReleasableSize() >= threshold ? pool.getActualSize() : 0;
-    };
+    return PoolCoalesceHeuristic<ResourceAwarePool>::known(
+        [=](const strategy::ResourceAwarePool& pool) {
+          // Calculate threshold in bytes from the percentage
+          const std::size_t threshold = static_cast<std::size_t>(f * pool.getActualSize());
+          return pool.getReleasableSize() >= threshold ? pool.getActualSize() : 0;
+        },
+        PoolCoalesceHeuristic<ResourceAwarePool>::Kind::percent_releasable,
+        percentage);
   }
 }
 
@@ -545,18 +560,27 @@ PoolCoalesceHeuristic<ResourceAwarePool> ResourceAwarePool::percent_releasable_h
                  fmt::format("Invalid percentage: {}, percentage must be an integer between 0 and 100", percentage));
   }
   if (percentage == 0) {
-    return [=](const ResourceAwarePool& UMPIRE_UNUSED_ARG(pool)) { return 0; };
+    return PoolCoalesceHeuristic<ResourceAwarePool>::known(
+        [=](const ResourceAwarePool& UMPIRE_UNUSED_ARG(pool)) { return 0; },
+        PoolCoalesceHeuristic<ResourceAwarePool>::Kind::percent_releasable_hwm,
+        percentage);
   } else if (percentage == 100) {
-    return [=](const strategy::ResourceAwarePool& pool) {
-      return pool.getActualSize() == pool.getReleasableSize() ? pool.getAlignedHighwaterMark() : 0;
-    };
+    return PoolCoalesceHeuristic<ResourceAwarePool>::known(
+        [=](const strategy::ResourceAwarePool& pool) {
+          return pool.getActualSize() == pool.getReleasableSize() ? pool.getAlignedHighwaterMark() : 0;
+        },
+        PoolCoalesceHeuristic<ResourceAwarePool>::Kind::percent_releasable_hwm,
+        percentage);
   } else {
     float f = (float)((float)percentage / (float)100.0);
-    return [=](const strategy::ResourceAwarePool& pool) {
-      // Calculate threshold in bytes from the percentage
-      const std::size_t threshold = static_cast<std::size_t>(f * pool.getActualSize());
-      return pool.getReleasableSize() >= threshold ? pool.getAlignedHighwaterMark() : 0;
-    };
+    return PoolCoalesceHeuristic<ResourceAwarePool>::known(
+        [=](const strategy::ResourceAwarePool& pool) {
+          // Calculate threshold in bytes from the percentage
+          const std::size_t threshold = static_cast<std::size_t>(f * pool.getActualSize());
+          return pool.getReleasableSize() >= threshold ? pool.getAlignedHighwaterMark() : 0;
+        },
+        PoolCoalesceHeuristic<ResourceAwarePool>::Kind::percent_releasable_hwm,
+        percentage);
   }
 }
 
