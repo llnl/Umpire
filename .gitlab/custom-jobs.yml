@@ -18,11 +18,18 @@
 # CI behavior.
 .custom_job:
   artifacts:
+    # Upload artifacts even when the job fails: build_and_test.sh writes
+    # timings.json from an EXIT trap, so failed builds still produce (partial)
+    # timing data we want to collect. Also preserves junit.xml on failure.
+    when: always
     reports:
       junit: junit.xml
     name: "${CI_PROJECT_NAME}-${CI_MACHINE}-${CI_JOB_NAME}-${CI_PIPELINE_ID}"
     paths:
       - ./*.cmake
+      # Per-job section timings, collected by the parent-pipeline `pages` job to
+      # track build/test timing evolution across commits.
+      - ./timings.json
 
 .reproducer_vars:
   script:
