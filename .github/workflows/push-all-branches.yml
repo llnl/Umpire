@@ -1,5 +1,11 @@
-on: push
-name: Code Checks (run on all branches)
+on:
+  push:
+    branches:
+      - develop
+      - main
+      - v*
+  pull_request:
+name: Code Checks
 jobs:
   staticAnalysis:
     name: Static Analysis

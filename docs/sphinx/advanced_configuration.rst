@@ -49,7 +49,7 @@ These arguments are explained in more detail below:
   allocator is available for use.
 
 * ``ENABLE_DOCS``
-  Build user documentation (with Sphinx) and code documentation (with Doxygen)
+  Build user documentation (with Sphinx) and code documentation (with Doxygen).
 
 * ``ENABLE_FORTRAN``
   Build the Fortran API.
@@ -69,7 +69,7 @@ These arguments are explained in more detail below:
 
 * ``UMPIRE_ENABLE_ASAN``
   This option enables address sanitization checks within Umpire by compilers
-  that support options like ``-fsanitize=address``
+  that support options like ``-fsanitize=address``.
 
 * ``UMPIRE_ENABLE_BACKTRACE_SYMBOLS``
   This option enables symbol information to be provided with backtraces.  This
@@ -99,7 +99,7 @@ These arguments are explained in more detail below:
   feature only exists for for ``HOST`` memory.
 
 * ``UMPIRE_ENABLE_LOGGING``
-  This option enables usage of Logging services for Umpire
+  This option enables usage of Logging services for Umpire.
 
 * ``UMPIRE_ENABLE_NUMA``
   This option enables support for NUMA. The
@@ -107,10 +107,10 @@ These arguments are explained in more detail below:
   option, which may be used to locate the allocation to a specific node.
 
 * ``UMPIRE_ENABLE_PERFORMANCE_TESTS``
-  Build and run performance tests
+  Build and run performance tests.
 
 * ``UMPIRE_ENABLE_SLIC``
   This option enables usage of logging services provided by SLIC.
 
 * ``UMPIRE_ENABLE_TOOLS``
-  Enable development tools for Umpire (replay, etc.)
+  Enable development tools for Umpire (replay, etc.).

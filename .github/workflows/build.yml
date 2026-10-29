@@ -1,4 +1,10 @@
-on: push
+on:
+  push:
+    branches:
+      - develop
+      - main
+      - v*
+  pull_request:
 name: Build
 jobs:
   build_docker:
