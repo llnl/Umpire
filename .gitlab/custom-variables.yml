@@ -17,6 +17,13 @@ variables:
   # Allocation name (used for shared allocations)
   ALLOC_NAME: ${CI_PROJECT_NAME}_ci_${CI_PIPELINE_ID}
 
+  # Persistent filesystem storage for Spack dependency caches and host-configs.
+  UMPIRE_CI_STORAGE_ROOT: /usr/workspace/umpire/ci-cache
+  UMPIRE_CI_STORAGE_GROUP: umpire
+  UMPIRE_CI_STORAGE_UMASK: "0002"
+  UMPIRE_CI_FORCE_SPACK: "false"
+  UMPIRE_CI_UPSTREAM_TARGET: "develop"
+
   # Dane (SLURM) allocation settings
   DANE_SHARED_ALLOC: "--exclusive --reservation=ci --time=10 --nodes=1"
   # Note: We repeat the reservation, helpful when jobs are manually re-triggered.

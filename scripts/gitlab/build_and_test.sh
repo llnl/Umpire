@@ -35,15 +35,27 @@ option=${1:-""}
 hostname="$(hostname)"
 truehostname=${hostname//[0-9]/}
 project_dir="$(pwd)"
+. "${project_dir}/scripts/gitlab/gitlab_logs_helpers.bash"
 
 hostconfig=${HOST_CONFIG:-""}
+hostconfig_path=""
 spec=${SPEC:-""}
 module_list=${MODULE_LIST:-""}
 job_unique_id=${CI_JOB_ID:-""}
 use_dev_shm=${USE_DEV_SHM:-true}
 spack_debug=${SPACK_DEBUG:-false}
 debug_mode=${DEBUG_MODE:-false}
-push_to_registry=${PUSH_TO_REGISTRY:-true}
+push_to_registry=${PUSH_TO_REGISTRY:-false}
+# PUSH_TO_REGISTRY defaults to false: the persistent filesystem install tree
+# (configured via UMPIRE_CI_STORAGE_ROOT) is used as a Spack upstream, which
+# is faster than a binary buildcache and requires no GitLab token for read
+# access. Set PUSH_TO_REGISTRY=true to additionally push to the OCI registry.
+umpire_ci_storage_root=${UMPIRE_CI_STORAGE_ROOT:-/usr/workspace/umpire/ci-cache}
+umpire_ci_storage_group=${UMPIRE_CI_STORAGE_GROUP:-umpire}
+umpire_ci_storage_umask=${UMPIRE_CI_STORAGE_UMASK:-0002}
+umpire_ci_force_spack=${UMPIRE_CI_FORCE_SPACK:-false}
+umpire_ci_cache_target=${UMPIRE_CI_CACHE_TARGET:-""}
+umpire_ci_upstream_target=${UMPIRE_CI_UPSTREAM_TARGET:-develop}
 
 # REGISTRY_TOKEN allows you to provide your own personal access token to the CI
 # registry. Be sure to set the token with at least read access to the registry.
@@ -52,151 +64,145 @@ ci_registry_image=${CI_REGISTRY_IMAGE:-"czregistry.llnl.gov:5050/radiuss/umpire"
 export ci_registry_user=${CI_REGISTRY_USER:-"${USER}"}
 export ci_registry_token=${CI_JOB_TOKEN:-"${registry_token}"}
 
+cache_key=""
+cache_target=""
+
 ###############################################################################
 # HELPER FUNCTIONS
 ###############################################################################
 
-# Helper function to print errors in red
-print_error ()
+sha256_hex ()
 {
-    local error_msg="${1}"
-    echo -e "\e[31m[Error]: ${error_msg}\e[0m"
-}
-
-# Helper function to print warnings in gray
-print_warning ()
-{
-    local warning_msg="${1}"
-    echo -e "\e[1;30m[Warning]: ${warning_msg}\e[0m"
-}
-
-# Helper function to print information
-print_info ()
-{
-    local info_msg="${1}"
-    echo -e "[Information]: ${info_msg}"
-}
-
-# Portable UTC timestamp formatter for epoch seconds.
-format_utc_timestamp ()
-{
-    local timestamp="${1}"
-    # BSD/macOS date supports epoch conversion via: date -r <seconds>
-    if date -u -r "${timestamp}" "+%Y-%m-%d %H:%M:%S UTC" >/dev/null 2>&1
+    if command -v sha256sum >/dev/null 2>&1
     then
-        date -u -r "${timestamp}" "+%Y-%m-%d %H:%M:%S UTC"
+        sha256sum | awk '{print $1}'
     else
-        # GNU date supports epoch conversion via: date -d "@<seconds>"
-        date -u -d "@${timestamp}" "+%Y-%m-%d %H:%M:%S UTC"
+        shasum -a 256 | awk '{print $1}'
     fi
 }
 
-# Portable elapsed time formatter (HH:MM:SS).
-format_elapsed_hms ()
+git_commit ()
 {
-    local elapsed="${1}"
-    printf '%02d:%02d:%02d' $((elapsed / 3600)) $(((elapsed % 3600) / 60)) $((elapsed % 60))
+    local repo_path="${1}"
+    git -C "${repo_path}" rev-parse HEAD 2>/dev/null || echo unknown
 }
 
-# Track script start time for elapsed time calculations
-script_start_time=$(date +%s)
-
-# Storage for section start times (supports nesting)
-declare -A section_start_times
-
-# Section stack for tracking nested sections
-section_id_stack=()
-section_counter=0
-section_indent=""
-
-# GitLab CI collapsible section helpers with nesting support
-section_start ()
+resolve_cache_target ()
 {
-    local section_name="${1}"
-    local section_title="${2}"
-    local section_state="${3:-""}"
+    local upstream_target="${umpire_ci_upstream_target}"
 
-    local collapsed="false"
-    if [[ "${section_state}" == "collapsed" ]]
+    if [[ -n "${umpire_ci_cache_target}" ]]
     then
-        collapsed="true"
-    fi
-
-    # Generate unique section ID
-    section_counter=$((section_counter + 1))
-    local section_id="${section_name}_${section_counter}"
-
-    local timestamp=$(date +%s)
-    local current_time=$(format_utc_timestamp "${timestamp}")
-    local total_elapsed=$((timestamp - script_start_time))
-    local total_elapsed_formatted=$(format_elapsed_hms "${total_elapsed}")
-
-    # Store section start time for later calculation
-    section_start_times[${section_id}]=${timestamp}
-
-    # Push section ID onto stack
-    section_id_stack+=("${section_id}")
-
-    echo -e "\e[1;30m${section_indent}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\e[0m"
-    echo -e "\e[1;30m${section_indent}~ TIME                    | TOTAL    | SECTION  \e[0m"
-    echo -e "\e[1;30m${section_indent}~ ${current_time} | ${total_elapsed_formatted} | ${section_title}\e[0m"
-    echo -e "\e[0Ksection_start:${timestamp}:${section_id}[collapsed=${collapsed}]\r\e[0K${section_indent}~ ${section_title}"
-
-    # Increase indentation for nested sections
-    section_indent="${section_indent}  "
-}
-
-section_end ()
-{
-    # Pop section ID from stack
-    if [[ ${#section_id_stack[@]} -eq 0 ]]; then
-        print_warning "section_end called with empty stack"
-        return 1
-    fi
-
-    # Decrease indentation before displaying
-    section_indent="${section_indent%  }"
-
-    local stack_index=$((${#section_id_stack[@]} - 1))
-    local section_id="${section_id_stack[$stack_index]}"
-    unset section_id_stack[$stack_index]
-
-    local timestamp=$(date +%s)
-    local current_time=$(format_utc_timestamp "${timestamp}")
-    local total_elapsed=$((timestamp - script_start_time))
-    local total_elapsed_formatted=$(format_elapsed_hms "${total_elapsed}")
-
-    # Calculate section elapsed time
-    local section_start=${section_start_times[${section_id}]:-${timestamp}}
-    local section_elapsed=$((timestamp - section_start))
-    local section_elapsed_formatted=$(format_elapsed_hms "${section_elapsed}")
-
-    echo -e "\e[0Ksection_end:${timestamp}:${section_id}\r\e[0K\e[0m"
-    echo -e "\e[1;30m${section_indent}~ ${current_time} | ${total_elapsed_formatted} | ${section_elapsed_formatted}\e[0m"
-    echo -e "\e[1;30m${section_indent}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\e[0m"
-
-    # Clean up stored time
-    unset section_start_times[${section_id}]
-}
-
-# For convenience, a helper function to run a command within a section and handle errors
-run_section() {
-    local id="$1"
-    local title="$2"
-    local collapsed="$3"
-    local err_msg="$4"
-    local status=0
-    shift 4
-
-    section_start "$id" "$title" "$collapsed"
-    if "$@"; then
-        section_end
+        echo "${umpire_ci_cache_target}"
+    elif [[ "${CI_COMMIT_BRANCH:-}" == "${CI_DEFAULT_BRANCH:-${upstream_target}}" ]]
+    then
+        echo "${upstream_target}"
+    elif [[ -n "${CI_COMMIT_REF_SLUG:-}" ]]
+    then
+        echo "ref-${CI_COMMIT_REF_SLUG}"
     else
-        status=$?
-        section_end
-        print_error "$err_msg"
-        exit $status
+        echo "manual"
     fi
+}
+
+resolve_cache_key ()
+{
+    # Cache identity captures inputs that materially affect dependency resolution.
+    printf '%s\n' \
+      "cache-format=umpire-ci-v1" \
+      "spec=${spec}" \
+      "module-list=${module_list}" \
+      "sys-type=${SYS_TYPE:-unknown}" \
+      "machine=${CI_MACHINE:-${truehostname}}" \
+      "uberenv-config-hash=$(sha256_hex < "${project_dir}/.uberenv_config.json")" \
+      "uberenv-commit=$(git_commit "${project_dir}/scripts/uberenv")" \
+      "radiuss-spack-configs-commit=$(git_commit "${project_dir}/scripts/radiuss-spack-configs")" | \
+      sha256_hex
+}
+
+cache_root_for ()
+{
+    local target="${1}"
+    printf '%s/%s/%s/%s' \
+      "${umpire_ci_storage_root}" \
+      "${SYS_TYPE:-unknown}" \
+      "${CI_MACHINE:-${truehostname}}" \
+      "${target}"
+}
+
+ensure_storage_dir ()
+{
+    local dir_path="${1}"
+    mkdir -p "${dir_path}"
+    if [[ -n "${umpire_ci_storage_group}" ]]
+    then
+        chgrp "${umpire_ci_storage_group}" "${dir_path}" 2>/dev/null || \
+          print_warning "Unable to set group ${umpire_ci_storage_group} on ${dir_path}"
+    fi
+    chmod g+rwxs "${dir_path}" 2>/dev/null || \
+      print_warning "Unable to set group writable permissions on ${dir_path}"
+}
+
+resolve_cache_context ()
+{
+    cache_target="$(resolve_cache_target)"
+    cache_key="$(resolve_cache_key)"
+    local cache_root cache_install_tree cache_buildcache cache_hostconfigs_dir
+    cache_root="$(cache_root_for "${cache_target}")"
+    cache_install_tree="${cache_root}/install"
+    cache_buildcache="${cache_root}/buildcache"
+    cache_hostconfigs_dir="${cache_root}/host-configs"
+
+    umask "${umpire_ci_storage_umask}"
+    ensure_storage_dir "${cache_install_tree}"
+    ensure_storage_dir "${cache_buildcache}"
+    ensure_storage_dir "${cache_hostconfigs_dir}"
+
+    print_info "Umpire CI cache target: ${cache_target}"
+    print_info "Umpire CI cache key: ${cache_key}"
+    print_info "Umpire CI cache root: ${cache_root}"
+}
+
+resolve_cached_hostconfig ()
+{
+    # Cache-read is read-only: try the branch target first, then upstream.
+    local targets=("${cache_target}")
+    if [[ "${cache_target}" != "${umpire_ci_upstream_target}" ]]
+    then
+        targets+=("${umpire_ci_upstream_target}")
+    fi
+
+    local target cache_root cache_install_tree cache_hostconfig_path spack_db_dir
+    for target in "${targets[@]}"
+    do
+        cache_root="$(cache_root_for "${target}")"
+        cache_install_tree="${cache_root}/install"
+        # Spack may pad install_tree with __spack_path_placeholder__ segments.
+        spack_db_dir="$(find "${cache_install_tree}" -mindepth 1 -maxdepth 8 -type d -name .spack-db 2>/dev/null | head -n 1 || true)"
+        if [[ -n "${spack_db_dir}" ]]
+        then
+            if [[ "$(dirname "${spack_db_dir}")" != "${cache_install_tree}" ]]
+            then
+                print_info "Resolved padded install tree for ${target}: $(dirname "${spack_db_dir}")"
+            fi
+            cache_install_tree="$(dirname "${spack_db_dir}")"
+        fi
+        cache_hostconfig_path="${cache_root}/host-configs/${cache_key}.cmake"
+
+        if [[ "${umpire_ci_force_spack}" != true ]] && \
+           [[ -f "${cache_hostconfig_path}" ]] && \
+           [[ -d "${cache_install_tree}" && -d "${cache_install_tree}/.spack-db" ]]
+        then
+            # Materialize a deterministic local path for downstream CMake steps.
+            cp "${cache_hostconfig_path}" "${project_dir}/$(basename "${cache_hostconfig_path}")"
+            hostconfig="$(basename "${cache_hostconfig_path}")"
+            hostconfig_path="${project_dir}/${hostconfig}"
+            print_info "Using cached host-config from ${target}: ${cache_hostconfig_path}"
+            return 0
+        fi
+    done
+
+    return 1
 }
 
 ###############################################################################
@@ -244,15 +250,6 @@ print_info "project_dir: ${project_dir}"
 
 mkdir -p ${prefix}
 
-spack_cmd="${prefix}/spack/bin/spack"
-spack_env_path="${prefix}/spack_env"
-uberenv_cmd="${project_dir}/scripts/uberenv/uberenv.py"
-if [[ ${spack_debug} == true ]]
-then
-    spack_cmd="${spack_cmd} --debug --stacktrace"
-    uberenv_cmd="${uberenv_cmd} --spack-debug"
-fi
-
 ###############################################################################
 # BUILD DEPENDENCIES
 ###############################################################################
@@ -266,37 +263,57 @@ then
         exit 1
     fi
 
-    prefix_opt="--prefix=${prefix}"
-
-    # We force Spack to put all generated files (cache and configuration of
-    # all sorts) in a unique location so that there can be no collision
-    # with existing or concurrent Spack.
-    spack_user_cache="${prefix}/spack-user-cache"
-    export SPACK_DISABLE_LOCAL_CONFIG=""
-    export SPACK_USER_CACHE_PATH="${spack_user_cache}"
-    mkdir -p ${spack_user_cache}
-
-    # generate cmake cache file with uberenv and radiuss spack package
-    run_section "spack_setup" "Spack setup and environment" "collapsed" \
-      "Spack environment setup failed (Uberenv)" \
-      ${uberenv_cmd} --setup-and-env-only --spec="${spec}" ${prefix_opt}
-
-    if [[ -n ${ci_registry_token} ]]
+    # Get a hostconfig file.
+    if [[ -n "${hostconfig}" ]]
     then
-        run_section "registry_setup" "GitLab registry as Spack Buildcache" "collapsed" \
-          "Adding gitlab registry to spack environment failed" \
-          ${spack_cmd} -D ${spack_env_path} mirror add --unsigned --oci-username-variable ci_registry_user --oci-password-variable ci_registry_token gitlab_ci oci://${ci_registry_image}
-    fi
+        # Scenario 1: HOST_CONFIG explicitly provided by caller.
+        if [[ -f "${hostconfig}" ]]
+        then
+            hostconfig_path="${hostconfig}"
+        elif [[ -f "${project_dir}/${hostconfig}" ]]
+        then
+            hostconfig_path="${project_dir}/${hostconfig}"
+        else
+            section_end ; print_error "HOST_CONFIG is set but file does not exist: ${hostconfig}"
+            exit 1
+        fi
+        print_info "HOST_CONFIG is set; skipping dependency installation and using provided host-config"
+    else
+        # Scenario 2: no HOST_CONFIG, so resolve cache identity and try read-only reuse.
+        resolve_cache_context
+        if resolve_cached_hostconfig
+        then
+            print_info "Cache hit; skipping dependency installation"
+        else
+            # Scenario 3: cache miss, so build dependencies and publish cache artifacts.
+            export PROJECT_DIR="${project_dir}"
+            export PREFIX="${prefix}"
+            export SPEC="${spec}"
+            export SPACK_DEBUG="${spack_debug}"
+            export CACHE_TARGET="${cache_target}"
+            export CACHE_KEY="${cache_key}"
+            export UMPIRE_CI_STORAGE_ROOT="${umpire_ci_storage_root}"
+            export UMPIRE_CI_STORAGE_GROUP="${umpire_ci_storage_group}"
+            export UMPIRE_CI_STORAGE_UMASK="${umpire_ci_storage_umask}"
+            export UMPIRE_CI_UPSTREAM_TARGET="${umpire_ci_upstream_target}"
+            export PUSH_TO_REGISTRY="${push_to_registry}"
+            export CI_REGISTRY_IMAGE="${ci_registry_image}"
+            export CI_REGISTRY_USER="${ci_registry_user}"
+            export CI_REGISTRY_TOKEN="${ci_registry_token}"
 
-    run_section "spack_build" "Spack build of dependencies" "collapsed" \
-      "Spack build of dependencies failed (Uberenv)" \
-      ${uberenv_cmd} --skip-setup-and-env --spec="${spec}" ${prefix_opt}
+            run_section "cache_miss" "Building dependencies on cache miss" "collapsed" \
+              "Spack dependency build failed" \
+              bash "${project_dir}/scripts/gitlab/build_deps_on_cache_miss.sh"
 
-    if [[ -n ${ci_registry_token} && ${push_to_registry} == true ]]
-    then
-        run_section "buildcache_push" "Push dependencies to buildcache" "collapsed" \
-          "Pushing dependencies to gitlab registry failed" \
-          ${spack_cmd} -D ${spack_env_path} buildcache push --only dependencies gitlab_ci
+            # Cache-miss script publishes host-config as <cache_key>.cmake.
+            hostconfig="${cache_key}.cmake"
+            hostconfig_path="${project_dir}/${hostconfig}"
+            if [[ ! -f "${hostconfig_path}" ]]
+            then
+                section_end ; print_error "Expected generated host-config not found: ${hostconfig_path}"
+                exit 1
+            fi
+        fi
     fi
 
     section_end
@@ -305,28 +322,10 @@ fi
 ###############################################################################
 # HOST CONFIG / CMAKE CACHE FILE
 ###############################################################################
-if [[ -z ${hostconfig} ]]
+if [[ -z "${hostconfig_path}" ]]
 then
-    # If no host config file was provided, we assume it was generated.
-    # This means we are looking of a unique one in project dir.
-    shopt -s nullglob; hostconfigs=( "${project_dir}"/*.cmake ); shopt -u nullglob
-    if [[ ${#hostconfigs[@]} == 1 ]]
-    then
-        hostconfig_path=${hostconfigs[0]}
-    elif [[ ${#hostconfigs[@]} == 0 ]]
-    then
-        print_error "No result for: ${project_dir}/*.cmake"
-        print_error "Spack generated host-config not found."
-        exit 1
-    else
-        print_error "More than one result for: ${project_dir}/*.cmake"
-        print_error "${hostconfigs[@]}"
-        print_error "Please specify one with HOST_CONFIG variable"
-        exit 1
-    fi
-else
-    # Using provided host-config file.
-    hostconfig_path="${project_dir}/${hostconfig}"
+    print_error "Host-config path is undefined. Provide HOST_CONFIG or run dependency setup."
+    exit 1
 fi
 
 hostconfig=$(basename ${hostconfig_path})
