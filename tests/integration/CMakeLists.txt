@@ -316,6 +316,9 @@ blt_add_target_compile_flags(
 blt_add_target_compile_flags(
   TO primary_pool_tests
   FLAGS ${UMPIRE_DISABLE_DEPRECATED_WARNINGS_FLAG})
+blt_add_target_compile_flags(
+  TO reallocate_tests
+  FLAGS ${UMPIRE_DISABLE_DEPRECATED_WARNINGS_FLAG})
 if (UMPIRE_ENABLE_PERFORMANCE_TESTS)
   blt_add_target_compile_flags(
     TO primary_pool_performance_tests 

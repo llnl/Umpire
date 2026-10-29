@@ -63,7 +63,9 @@ if (UMPIRE_ENABLE_HIP)
     NAME multi_device
     SOURCES multi_device.cpp
     DEPENDS_ON umpire blt::hip)
-
+  blt_add_target_compile_flags(
+    TO multi_device
+    FLAGS ${UMPIRE_DISABLE_DEPRECATED_WARNINGS_FLAG})
   list(APPEND umpire_examples multi_device)
 endif()
 

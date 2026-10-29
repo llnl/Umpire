@@ -6,6 +6,7 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "umpire/Allocator.hpp"
 #include "umpire/ResourceManager.hpp"
+#include "umpire/op.hpp"
 
 int main(int, char**)
 {
@@ -40,7 +41,7 @@ int main(int, char**)
     std::cout << "Reallocating data (" << data << ") to size " << REALLOCATED_SIZE << "...";
 
     // _sphinx_tag_tut_realloc_start
-    data = static_cast<double*>(rm.reallocate(data, REALLOCATED_SIZE));
+    data = umpire::reallocate(&data, REALLOCATED_SIZE);
     // _sphinx_tag_tut_realloc_end
 
     std::cout << "done.  Reallocated data (" << data << ")" << std::endl;

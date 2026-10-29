@@ -38,8 +38,8 @@ ENV GTEST_COLOR=1
 COPY . /home/umpire/workspace
 WORKDIR /home/umpire/workspace/build
 RUN cmake -DUMPIRE_ENABLE_DEVELOPER_DEFAULTS=On -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER=clang \
-          -DUMPIRE_ENABLE_C=On -DCMAKE_CXX_FLAGS="-fsanitize=address" -DENABLE_TESTS=On -DUMPIRE_ENABLE_TOOLS=On \
-          -DUMPIRE_ENABLE_ASAN=On -DUMPIRE_ENABLE_SANITIZER_TESTS=On .. && \
+    -DUMPIRE_ENABLE_C=On -DCMAKE_CXX_FLAGS="-fsanitize=address" -DENABLE_TESTS=On -DUMPIRE_ENABLE_TOOLS=On \
+    -DUMPIRE_ENABLE_ASAN=On -DUMPIRE_ENABLE_SANITIZER_TESTS=On .. && \
     make -j 2 && \
     ctest -T test -E operation_tests --output-on-failure
 
@@ -48,7 +48,7 @@ ENV GTEST_COLOR=1
 COPY . /home/umpire/workspace
 WORKDIR /home/umpire/workspace/build
 RUN cmake -DUMPIRE_ENABLE_DEVELOPER_DEFAULTS=On -DCMAKE_CXX_COMPILER=g++ -DENABLE_CUDA=On -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc -DCMAKE_CUDA_ARCHITECTURES=70 .. && \
-    make -j 16
+    make -j 8
 
 FROM ghcr.io/llnl/radiuss:cuda-13-0-ubuntu-24.04 AS cuda13
 ENV GTEST_COLOR=1

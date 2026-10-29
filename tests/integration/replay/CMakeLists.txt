@@ -48,6 +48,10 @@ blt_add_executable(
   SOURCES replay_tests.cpp
   DEPENDS_ON ${replay_integration_tests_depends})
 
+blt_add_target_compile_flags(
+  TO replay_tests
+  FLAGS ${UMPIRE_DISABLE_DEPRECATED_WARNINGS_FLAG})
+
 add_custom_target(
   regen_replay_output
   COMMAND  ${CMAKE_COMMAND} -E env UMPIRE_REPLAY=On $<TARGET_FILE:replay_tests> && mv *.stats ${CMAKE_CURRENT_SOURCE_DIR}/${replay_file} && rm -f *.stats)

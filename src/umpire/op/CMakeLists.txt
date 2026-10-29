@@ -49,7 +49,12 @@ if (UMPIRE_ENABLE_CUDA)
     CudaAdviseOperation.cpp
     CudaCopyOperation.cpp
     CudaMemsetOperation.cpp
-    CudaMemPrefetchOperation.cpp)
+    CudaMemPrefetchOperation.cpp
+    cuda.cu)
+
+  set_source_files_properties(
+    cuda.cu
+    PROPERTIES LANGUAGE CUDA)
 
   set (umpire_op_depends
     ${umpire_op_depends}
@@ -67,7 +72,12 @@ if (UMPIRE_ENABLE_HIP)
     ${umpire_op_sources}
     HipAdviseOperation.cpp
     HipCopyOperation.cpp
-    HipMemsetOperation.cpp)
+    HipMemsetOperation.cpp
+    hip.cpp)
+
+  set_source_files_properties(
+    hip.cpp
+    PROPERTIES LANGUAGE HIP)
 
   set (umpire_op_depends
     ${umpire_op_depends}
@@ -89,7 +99,8 @@ if (UMPIRE_ENABLE_SYCL)
     SyclCopyFromOperation.cpp
     SyclCopyToOperation.cpp
     SyclMemsetOperation.cpp
-    SyclMemPrefetchOperation.cpp)
+    SyclMemPrefetchOperation.cpp
+    sycl_device_memset.cpp)
 endif ()
 
 if (UMPIRE_ENABLE_OPENMP_TARGET)
@@ -120,6 +131,7 @@ target_include_directories(
   umpire_op
   PUBLIC
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src>
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
   $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
