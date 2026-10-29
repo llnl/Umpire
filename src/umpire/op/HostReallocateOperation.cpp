@@ -10,6 +10,7 @@
 
 #include "umpire/ResourceManager.hpp"
 #include "umpire/strategy/mixins/Inspector.hpp"
+#include "umpire/util/AllocationHeader.hpp"
 #include "umpire/util/error.hpp"
 
 namespace umpire {
@@ -32,6 +33,16 @@ void HostReallocateOperation::transform(void* current_ptr, void** new_ptr, util:
     ResourceManager::getInstance().copy(*new_ptr, current_ptr, copy_size);
     allocator.deallocate(current_ptr);
   } else {
+#if defined(UMPIRE_ENABLE_INTROSPECTION_HEADER)
+    void* base_ptr{::realloc(util::get_base_pointer(current_ptr), new_size + util::allocation_header_size)};
+
+    if (!base_ptr) {
+      UMPIRE_ERROR(runtime_error, fmt::format("::realloc(current_ptr={}, old_size={}, new_size={}) failed.",
+                                              current_ptr, old_size, new_size));
+    }
+
+    *new_ptr = util::write_allocation_header(base_ptr, new_size, new_allocation->strategy);
+#else
     auto old_record = ResourceManager::getInstance().deregisterAllocation(current_ptr);
     *new_ptr = ::realloc(current_ptr, new_size);
 
@@ -41,6 +52,7 @@ void HostReallocateOperation::transform(void* current_ptr, void** new_ptr, util:
     }
 
     ResourceManager::getInstance().registerAllocation(*new_ptr, {*new_ptr, new_size, new_allocation->strategy});
+#endif
   }
 }
 

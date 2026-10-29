@@ -114,6 +114,10 @@ TEST_P(AllocatorTest, GetById)
 
 TEST_P(AllocatorTest, get_allocator_records)
 {
+#if defined(UMPIRE_ENABLE_INTROSPECTION_HEADER)
+  GTEST_SKIP() << "Allocation records cannot be enumerated with UMPIRE_ENABLE_INTROSPECTION_HEADER";
+#endif
+
   double* data = static_cast<double*>(m_allocator->allocate(m_small * sizeof(double)));
 
   auto records = umpire::get_allocator_records(*m_allocator);
