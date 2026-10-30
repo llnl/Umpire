@@ -42,6 +42,35 @@ the GPU) will share the GPU memory, while the "node" scope means that all
 processes on the same node (as determined by MPI_COMM_TYPE_SHARED) will share
 the GPU memory.
 
+Loading Data from a File into Shared GPU Memory
+-----------------------------------------------
+
+A common use case is reading a large data set from disk once per socket and
+sharing it between all ranks on that socket, rather than replicating it in
+every rank's GPU memory. The following recipe reads a tetrahedral mesh (three
+arrays of doubles for the node coordinates and four arrays of integers for the
+connectivity) from a file into socket-scoped shared GPU memory.
+
+The key points are:
+
+1. Every rank reads (or receives via broadcast) the array sizes, since all
+   ranks in a scope must request identically-sized allocations in the same
+   order.
+2. ``umpire::get_communicator_for_allocator`` is used to retrieve the scope
+   (socket) communicator, and only the scope-leader rank (rank 0 in that
+   communicator) reads the file contents and copies them into the GPU arrays.
+3. A barrier on the scope communicator ensures the data is in place before
+   any rank uses the shared memory.
+
+Note that while the application-level coordination (broadcasting sizes, file
+I/O) can use any MPI communicator, the ``DeviceIpcAllocator`` constructor,
+``allocate``, and ``deallocate`` calls are collective and internally split
+MPI_COMM_WORLD to form the socket scope, so all ranks in MPI_COMM_WORLD must
+participate in those calls.
+
+.. literalinclude:: ../../../examples/cookbook/recipe_device_ipc_from_file.cpp
+   :language: cpp
+
 Limitations
 -----------
 
