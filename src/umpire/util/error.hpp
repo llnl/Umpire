@@ -123,7 +123,6 @@ class resource_error : public umpire::runtime_error {
   {                                                                       \
     type e{msg, std::string{__FILE__}, __LINE__};                         \
     UMPIRE_LOG(Error, e.what());                                          \
-    umpire::util::flush_files();                                          \
     throw e;                                                              \
   }
 #endif

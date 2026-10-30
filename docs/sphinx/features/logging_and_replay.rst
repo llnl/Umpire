@@ -15,6 +15,8 @@ If Umpire logging is enabled, it may be controlled by setting the
 ``UMPIRE_LOG_LEVEL`` environment variable to ``Error``, ``Warning``, ``Info``,
 or ``Debug``.  The ``Debug`` value is the most verbose.
 
+Read more about advanced logging configurations :doc:`here <logging_configuration>`.
+
 When ``UMPIRE_LOG_LEVEL`` has been set, events will be logged to the standard
 output.
 
