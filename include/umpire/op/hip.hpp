@@ -199,10 +199,27 @@ inline void memset(T* ptr, int value, std::size_t count)
 }
 
 /**
+ * @brief Element types for which device_memset is explicitly instantiated
+ *
+ * Must be kept in sync with the explicit instantiation lists in
+ * src/umpire/op/hip.cpp.
+ */
+template <typename T>
+inline constexpr bool is_device_memset_type_v =
+    std::is_same_v<T, char> || std::is_same_v<T, signed char> || std::is_same_v<T, unsigned char> ||
+    std::is_same_v<T, short> || std::is_same_v<T, unsigned short> || std::is_same_v<T, int> ||
+    std::is_same_v<T, unsigned int> || std::is_same_v<T, long> || std::is_same_v<T, unsigned long> ||
+    std::is_same_v<T, long long> || std::is_same_v<T, unsigned long long> || std::is_same_v<T, float> ||
+    std::is_same_v<T, double> || std::is_same_v<T, bool>;
+
+/**
  * @brief Synchronous memory set implementation using device kernel
  *
  * Sets each element in the array to the specified value using a HIP kernel
  * Unlike standard memset which operates on bytes, this operates on typed elements.
+ * Launches on the device owning ptr (from hipPointerGetAttributes) and
+ * synchronizes the launch stream before returning. The current device is
+ * restored afterward.
  *
  * @tparam T Type of array elements
  * @param ptr Pointer to array
@@ -211,6 +228,22 @@ inline void memset(T* ptr, int value, std::size_t count)
  */
 template <typename T>
 void device_memset(T* ptr, T value, std::size_t count);
+
+/**
+ * @brief Asynchronous memory set implementation using device kernel
+ *
+ * Launches on the given stream and device without synchronizing. The current
+ * device is restored afterward.
+ *
+ * @tparam T Type of array elements
+ * @param ptr Pointer to array
+ * @param value Value to set each element to
+ * @param count Number of elements to set
+ * @param stream Stream to launch on
+ * @param device Device to launch on
+ */
+template <typename T>
+void device_memset(T* ptr, T value, std::size_t count, hipStream_t stream, int device);
 
 /**
  * @brief Asynchronous memory set implementation
@@ -473,20 +506,29 @@ struct device_memset<resource::hip_platform> {
    * @param val Value to set each element to
    * @param len Number of elements to set
    */
-  template <typename T>
-  static void exec(T* ptr, T val, std::size_t len)
+  template <typename T, typename V>
+  static void exec(T* ptr, V val, std::size_t len)
   {
-    detail::device_memset(ptr, val, len);
+    static_assert(detail::is_device_memset_type_v<T>,
+                  "umpire::device_memset (HIP) supports only: char, signed char, unsigned char, short, "
+                  "unsigned short, int, unsigned int, long, unsigned long, long long, unsigned long long, "
+                  "float, double, bool");
+    detail::device_memset<T>(ptr, static_cast<T>(val), len);
   }
 
-  // Async overload for API parity: the underlying kernel wrapper synchronizes
-  // the device before returning, so the returned event represents completed
-  // work.
-  template <typename T>
-  static camp::resources::EventProxy<camp::resources::Resource> exec(T* ptr, T val, std::size_t len,
+  // Async overload: launches on the resource's stream and device without
+  // synchronizing; the returned event tracks completion.
+  template <typename T, typename V>
+  static camp::resources::EventProxy<camp::resources::Resource> exec(T* ptr, V val, std::size_t len,
                                                                      camp::resources::Resource& res)
   {
-    detail::device_memset(ptr, val, len);
+    static_assert(detail::is_device_memset_type_v<T>,
+                  "umpire::device_memset (HIP) supports only: char, signed char, unsigned char, short, "
+                  "unsigned short, int, unsigned int, long, unsigned long, long long, unsigned long long, "
+                  "float, double, bool");
+    auto stream = detail::get_stream(res);
+    int device = res.get<camp::resources::Hip>().get_device();
+    detail::device_memset<T>(ptr, static_cast<T>(val), len, stream, device);
     return camp::resources::EventProxy<camp::resources::Resource>{res};
   }
 };

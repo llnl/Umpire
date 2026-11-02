@@ -7,6 +7,7 @@
 #include "umpire/config.hpp"
 #include "umpire/op/detail/traits.hpp"
 #include "umpire/op/detail/utils.hpp"
+#include "umpire/op/operations.hpp"
 #include "umpire/resource/platform.hpp"
 
 namespace umpire {
@@ -263,18 +264,39 @@ struct op_caller {
   }
 #endif // UMPIRE_ENABLE_BOUNDS_CHECKS
 
+  // Pointer used for the allocation map lookup in single-pointer operations.
+  // Only reallocate takes a pointer-to-pointer in-out parameter (T**) whose
+  // pointee is the allocation; every other operation operates on the pointer
+  // itself, even when the element type is itself a pointer (e.g. double**).
+  template <typename T>
+  static auto get_lookup_ptr(T* ptr)
+  {
+    if constexpr (std::is_same_v<Op<resource::host_platform>, reallocate<resource::host_platform>>) {
+      return detail::get_base_ptr(ptr);
+    } else {
+      return ptr;
+    }
+  }
+
+  // memset and device_memset both take {value, length} and share bounds checks
+  static constexpr bool is_memset_op()
+  {
+    return std::is_same_v<Op<resource::host_platform>, memset<resource::host_platform>> ||
+           std::is_same_v<Op<resource::host_platform>, device_memset<resource::host_platform>>;
+  }
+
   // Single-pointer operations (synchronous)
   template <typename T, typename... Args>
   inline static auto exec(T* src, Args... args)
   {
     auto& rm = ResourceManager::getInstance();
     auto& allocation_map = rm.m_allocations;
-    auto src_record = allocation_map.find(detail::get_base_ptr(src));
+    auto src_record = allocation_map.find(get_lookup_ptr(src));
     auto p = src_record->strategy->getPlatform();
 
     // Operation-specific handling
-    if constexpr (std::is_same_v<Op<resource::host_platform>, memset<resource::host_platform>>) {
-      // For memset, we expect args to be {value, size}
+    if constexpr (is_memset_op()) {
+      // For memset/device_memset, we expect args to be {value, size}
 #ifdef UMPIRE_ENABLE_BOUNDS_CHECKS
       std::size_t length = get_arg<1>(args...);
       check_memset_bounds(src, src_record, length);
@@ -291,12 +313,12 @@ struct op_caller {
   {
     auto& rm = ResourceManager::getInstance();
     auto& allocation_map = rm.m_allocations;
-    auto src_record = allocation_map.find(detail::get_base_ptr(src));
+    auto src_record = allocation_map.find(get_lookup_ptr(src));
     auto p = src_record->strategy->getPlatform();
 
     // Operation-specific handling
-    if constexpr (std::is_same_v<Op<resource::host_platform>, memset<resource::host_platform>>) {
-      // For memset, we expect args to be {value, size}
+    if constexpr (is_memset_op()) {
+      // For memset/device_memset, we expect args to be {value, size}
 #ifdef UMPIRE_ENABLE_BOUNDS_CHECKS
       std::size_t length = get_arg<1>(args...);
       check_memset_bounds(src, src_record, length);
@@ -312,7 +334,7 @@ struct op_caller {
   {
     auto& rm = ResourceManager::getInstance();
     auto& allocation_map = rm.m_allocations;
-    auto src_record = allocation_map.find(detail::get_base_ptr(src));
+    auto src_record = allocation_map.find(src);
     auto dst_record = allocation_map.find(dst);
 
     auto p1 = src_record->strategy->getPlatform();
@@ -338,7 +360,7 @@ struct op_caller {
   {
     auto& rm = ResourceManager::getInstance();
     auto& allocation_map = rm.m_allocations;
-    auto src_record = allocation_map.find(detail::get_base_ptr(src));
+    auto src_record = allocation_map.find(src);
     auto dst_record = allocation_map.find(dst);
 
     auto p1 = src_record->strategy->getPlatform();
@@ -666,19 +688,18 @@ camp::resources::EventProxy<camp::resources::Resource> op::reallocate<Platform>:
 
   auto event = umpire::copy(static_cast<void*>(current_ptr), static_cast<void*>(new_ptr), copy_bytes, ctx);
 
-  // Guard old pointer for cleanup after copy completes
-  auto cleanup = detail::make_scope_exit([&]() {
-    allocator.deallocate(current_ptr);
-  });
-
   // NOTE: This wait is an intentional blocking point. It guarantees the copy
   // has completed before the old buffer is freed (and before we dismiss the
-  // new-pointer guard below). A true non-blocking async reallocate that defers
-  // the old-buffer free until the event completes is left as a follow-up.
+  // new-pointer guard below). If the wait throws, only the new buffer is
+  // released; the old buffer and *ptr_ptr are left untouched and valid. A true
+  // non-blocking async reallocate that defers the old-buffer free until the
+  // event completes is left as a follow-up.
   static_cast<camp::resources::Event>(event).wait();
-  // cleanup happens automatically via RAII
 
-  // Copy (and wait) succeeded: the new allocation is valid, dismiss its guard.
+  // Copy (and wait) succeeded, deallocate old memory
+  allocator.deallocate(current_ptr);
+
+  // The new allocation is now the live one, dismiss its guard.
   new_cleanup.dismiss();
 
   *ptr_ptr = new_ptr;
@@ -742,8 +763,8 @@ auto memset(T* ptr, int value, std::size_t len, camp::resources::Resource& ctx)
   return op::memset<Platform>::exec(ptr, value, len, ctx);
 }
 
-template <typename Platform, typename T>
-void device_memset(T* ptr, T value, std::size_t len)
+template <typename Platform, typename T, typename V>
+void device_memset(T* ptr, V value, std::size_t len)
 {
   op::device_memset<Platform>::exec(ptr, value, len);
 }

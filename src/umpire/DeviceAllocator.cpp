@@ -119,8 +119,7 @@ __host__ __device__ void DeviceAllocator::reset()
 {
   // Set m_counter back to zero
 #if !defined(__CUDA_ARCH__) && !defined(__HIP_DEVICE_COMPILE__)
-  auto& rm = umpire::ResourceManager::getInstance();
-  rm.memset(m_counter, 0);
+  umpire::memset(m_counter, 0, 1);
 #else
   unsigned int assumed, old;
   do {

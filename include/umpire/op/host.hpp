@@ -85,14 +85,14 @@ struct device_memset<resource::host_platform> {
    * @param val Value to set (unused)
    * @param len Number of elements to set (unused)
    */
-  template <typename T>
-  static void exec(T* /*ptr*/, int /*val*/, std::size_t /*len*/)
+  template <typename T, typename V>
+  static void exec(T* /*ptr*/, V /*val*/, std::size_t /*len*/)
   {
     UMPIRE_ERROR(runtime_error, "device_memset cannot be used on host memory. Use memset instead.");
   }
 
-  template <typename T>
-  static camp::resources::EventProxy<camp::resources::Resource> exec(T* /*ptr*/, int /*val*/, std::size_t /*len*/,
+  template <typename T, typename V>
+  static camp::resources::EventProxy<camp::resources::Resource> exec(T* /*ptr*/, V /*val*/, std::size_t /*len*/,
                                                                      camp::resources::Resource& /*resource*/)
   {
     UMPIRE_ERROR(runtime_error, "device_memset cannot be used on host memory. Use memset instead.");

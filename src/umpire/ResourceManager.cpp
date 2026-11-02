@@ -599,6 +599,12 @@ void ResourceManager::copy(void* dst_ptr, void* src_ptr, std::size_t size)
         .tag("replay", "true");
   });
 
+  std::size_t dst_size = dst_alloc_record->size - dst_offset;
+  if (size > dst_size) {
+    UMPIRE_ERROR(runtime_error,
+                 fmt::format("Not enough space in destination to copy {} bytes into {} bytes", size, dst_size));
+  }
+
   umpire::copy(static_cast<void*>(src_ptr), static_cast<void*>(dst_ptr), size);
 #else
   UMPIRE_LOG(Debug, "(src_ptr=" << src_ptr << ", dst_ptr=" << dst_ptr << ", size=" << size << ")");
@@ -676,6 +682,11 @@ camp::resources::EventProxy<camp::resources::Resource> ResourceManager::copy(voi
         .tag("async", "true");
   });
 
+  std::size_t dst_size = dst_alloc_record->size - dst_offset;
+  if (size > dst_size) {
+    UMPIRE_ERROR(runtime_error, fmt::format("Not enough resource in destination for copy: {} -> {}", size, dst_size));
+  }
+
   return umpire::copy(static_cast<void*>(src_ptr), static_cast<void*>(dst_ptr), size, ctx);
 #else
   UMPIRE_LOG(Debug, "(src_ptr=" << src_ptr << ", dst_ptr=" << dst_ptr << ", size=" << size << ")");
@@ -743,6 +754,10 @@ void ResourceManager::memset(void* ptr, int value, std::size_t length)
         .tag("replay", "true");
   });
 
+  if (length > size) {
+    UMPIRE_ERROR(runtime_error, fmt::format("Cannot memset over the end of allocation: {} -> {}", length, size));
+  }
+
   umpire::memset(static_cast<void*>(ptr), value, length);
 #else
   UMPIRE_LOG(Debug, "(ptr=" << ptr << ", value=" << value << ", length=" << length << ")");
@@ -805,6 +820,10 @@ camp::resources::EventProxy<camp::resources::Resource> ResourceManager::memset(v
         .tag("replay", "true")
         .tag("async", "true");
   });
+
+  if (length > size) {
+    UMPIRE_ERROR(runtime_error, fmt::format("Cannot memset over the end of allocation: {} -> {}", length, size));
+  }
 
   return umpire::memset(static_cast<void*>(ptr), value, length, ctx);
 #else
@@ -1390,7 +1409,7 @@ void* ResourceManager::move(void* src_ptr, Allocator allocator)
   }
 
   void* dst_ptr{allocator.allocate(alloc_record->size)};
-  copy(dst_ptr, src_ptr);
+  umpire::copy(src_ptr, dst_ptr, alloc_record->size);
 
   deallocate(src_ptr);
 

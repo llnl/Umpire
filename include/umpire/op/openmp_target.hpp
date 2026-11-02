@@ -72,7 +72,27 @@ inline int get_device(camp::resources::Resource& resource)
 } // namespace detail
 
 // OpenMP Target implementation helpers
-namespace {
+//
+// These live in a backend-specific namespace (rather than an anonymous one in
+// umpire::op) so they cannot collide with the identically-shaped helpers in
+// the other backend headers (e.g. op/sycl.hpp) when several backends are
+// enabled in the same build.
+namespace detail {
+namespace omp_target_impl {
+// Order an async op after the resource's pending work
+//
+// The async ops below execute synchronously on the host thread (see the
+// "OpenMP Target Async Limitations" note), so they are not enqueued on `res`.
+// Validate that `res` is actually an Omp resource (fail fast on mismatched
+// resource types, matching the get_stream()/get_queue() pattern used by other
+// backends), then wait on its pending work so the op is ordered after it,
+// matching the old MemoryOperation::transform_async/apply_async pattern.
+inline void wait_for_resource(camp::resources::Resource& res)
+{
+  detail::get_device(res);
+  res.get_event().wait();
+}
+
 // Helper function for device-to-device copy operations
 //
 // Both pointers live on OpenMP target devices, so the device id for each
@@ -145,9 +165,10 @@ inline void device_to_host_copy_impl(T* src_ptr, T* dst_ptr, std::size_t count) 
 //   - All "async" operations execute synchronously
 //   - Return a completed event immediately after operation finishes
 //   - No actual overlap with host computation
-//   - The camp::resources::Resource is still validated/used to target the
-//     correct OpenMP device explicitly (via detail::get_device()), even
-//     though the operation itself does not run concurrently with the host
+//   - The camp::resources::Resource is validated and its pending work is
+//     waited on before the operation runs (via wait_for_resource()); the
+//     device(s) targeted are always derived from the pointers' Umpire
+//     allocation records, matching the synchronous operations
 //
 // This means:
 //   - Performance: Same as synchronous operations
@@ -160,11 +181,9 @@ inline void device_to_host_copy_impl(T* src_ptr, T* dst_ptr, std::size_t count) 
 template <typename T>
 inline camp::resources::EventProxy<camp::resources::Resource> copy_async_impl(
     T* src_ptr, T* dst_ptr, std::size_t count, camp::resources::Resource& res) {
-  // Validate that res is actually an Omp resource (fail fast on mismatched
-  // resource types, matching the get_stream()/get_queue() pattern used by
-  // other backends). The actual src/dst devices for the copy are still
-  // derived per-pointer, since a copy may span two different devices.
-  detail::get_device(res);
+  // The src/dst devices for the copy are derived per-pointer, since a copy
+  // may span two different devices.
+  wait_for_resource(res);
   copy_impl(src_ptr, dst_ptr, count);
   return camp::resources::EventProxy<camp::resources::Resource>{res};
 }
@@ -173,8 +192,8 @@ inline camp::resources::EventProxy<camp::resources::Resource> copy_async_impl(
 template <typename T>
 inline camp::resources::EventProxy<camp::resources::Resource> host_to_device_async_impl(
     T* src_ptr, T* dst_ptr, std::size_t count, camp::resources::Resource& res) {
-  // See copy_async_impl: validate resource type, devices derived per-pointer.
-  detail::get_device(res);
+  // See copy_async_impl: devices derived per-pointer.
+  wait_for_resource(res);
   host_to_device_copy_impl(src_ptr, dst_ptr, count);
   return camp::resources::EventProxy<camp::resources::Resource>{res};
 }
@@ -183,8 +202,8 @@ inline camp::resources::EventProxy<camp::resources::Resource> host_to_device_asy
 template <typename T>
 inline camp::resources::EventProxy<camp::resources::Resource> device_to_host_async_impl(
     T* src_ptr, T* dst_ptr, std::size_t count, camp::resources::Resource& res) {
-  // See copy_async_impl: validate resource type, devices derived per-pointer.
-  detail::get_device(res);
+  // See copy_async_impl: devices derived per-pointer.
+  wait_for_resource(res);
   device_to_host_copy_impl(src_ptr, dst_ptr, count);
   return camp::resources::EventProxy<camp::resources::Resource>{res};
 }
@@ -211,40 +230,50 @@ inline void memset_impl(T* ptr, int val, std::size_t count) {
 
 // Helper function for memset operations that returns an Event
 //
-// Unlike memset_impl (which derives the device from the pointer's
-// allocation record), the async version targets the device carried by the
-// Resource explicitly, mirroring how CUDA/HIP/SYCL async ops pull their
-// stream/queue from the Resource.
+// Like memset_impl, the device is derived from the pointer's allocation
+// record (the memory lives on that device regardless of `res`'s device),
+// mirroring OpenMPTargetMemsetOperation.
 template <typename T>
 inline camp::resources::EventProxy<camp::resources::Resource> memset_async_impl(
     T* ptr, int val, std::size_t count, camp::resources::Resource& res) {
-  std::size_t size = detail::get_size<T>(count);
-
-  int device = detail::get_device(res);
-  unsigned char* data_ptr = reinterpret_cast<unsigned char*>(ptr);
-
-#pragma omp target is_device_ptr(data_ptr) device(device)
-#pragma omp teams distribute parallel for schedule(static, 1)
-  for (std::size_t i = 0; i < size; ++i) {
-    data_ptr[i] = static_cast<unsigned char>(val);
-  }
+  wait_for_resource(res);
+  memset_impl(ptr, val, count);
 
   return camp::resources::EventProxy<camp::resources::Resource>{res};
 }
-} // namespace
+
+// Helper function for typed (element-wise) device_memset
+//
+// The device id is derived from the pointer's Umpire allocation record, as
+// in memset_impl (mirrors OpenMPTargetMemsetOperation's device(...) clause).
+template <typename T>
+inline void device_memset_impl(T* ptr, T value, std::size_t len) {
+  if (!ptr || len == 0) {
+    return;
+  }
+
+  int device = detail::get_device_id(ptr);
+
+  #pragma omp target teams distribute parallel for is_device_ptr(ptr) device(device)
+  for (std::size_t i = 0; i < len; i++) {
+    ptr[i] = value;
+  }
+}
+} // namespace omp_target_impl
+} // namespace detail
 
 // Device-to-device copy specialization
 template<>
 struct copy<resource::omp_target_platform, resource::omp_target_platform> {
   template <typename T>
   static void exec(T* src_ptr, T* dst_ptr, std::size_t len) {
-    copy_impl(src_ptr, dst_ptr, len);
+    detail::omp_target_impl::copy_impl(src_ptr, dst_ptr, len);
   }
   
   template <typename T>
   static camp::resources::EventProxy<camp::resources::Resource> exec(
       T* src_ptr, T* dst_ptr, std::size_t len, camp::resources::Resource& res) {
-    return copy_async_impl(src_ptr, dst_ptr, len, res);
+    return detail::omp_target_impl::copy_async_impl(src_ptr, dst_ptr, len, res);
   }
 };
 
@@ -253,13 +282,13 @@ template<>
 struct copy<resource::host_platform, resource::omp_target_platform> {
   template <typename T>
   static void exec(T* src_ptr, T* dst_ptr, std::size_t len) {
-    host_to_device_copy_impl(src_ptr, dst_ptr, len);
+    detail::omp_target_impl::host_to_device_copy_impl(src_ptr, dst_ptr, len);
   }
   
   template <typename T>
   static camp::resources::EventProxy<camp::resources::Resource> exec(
       T* src_ptr, T* dst_ptr, std::size_t len, camp::resources::Resource& res) {
-    return host_to_device_async_impl(src_ptr, dst_ptr, len, res);
+    return detail::omp_target_impl::host_to_device_async_impl(src_ptr, dst_ptr, len, res);
   }
 };
 
@@ -268,13 +297,13 @@ template<>
 struct copy<resource::omp_target_platform, resource::host_platform> {
   template <typename T>
   static void exec(T* src_ptr, T* dst_ptr, std::size_t len) {
-    device_to_host_copy_impl(src_ptr, dst_ptr, len);
+    detail::omp_target_impl::device_to_host_copy_impl(src_ptr, dst_ptr, len);
   }
   
   template <typename T>
   static camp::resources::EventProxy<camp::resources::Resource> exec(
       T* src_ptr, T* dst_ptr, std::size_t len, camp::resources::Resource& res) {
-    return device_to_host_async_impl(src_ptr, dst_ptr, len, res);
+    return detail::omp_target_impl::device_to_host_async_impl(src_ptr, dst_ptr, len, res);
   }
 };
 
@@ -283,54 +312,38 @@ template<>
 struct memset<resource::omp_target_platform> {
   template <typename T>
   static void exec(T* ptr, int val, std::size_t len) {
-    memset_impl(ptr, val, len);
+    detail::omp_target_impl::memset_impl(ptr, val, len);
   }
 
   template <typename T>
   static camp::resources::EventProxy<camp::resources::Resource> exec(
       T* ptr, int val, std::size_t len, camp::resources::Resource& res) {
-    return memset_async_impl(ptr, val, len, res);
+    return detail::omp_target_impl::memset_async_impl(ptr, val, len, res);
   }
 };
 
 // device_memset specialization
+//
+// The value type V may differ from the element type T (e.g. an int literal
+// for a double* buffer), so it is converted to T before launching the kernel.
 template<>
 struct device_memset<resource::omp_target_platform> {
-  // NOTE: this synchronous signature carries no device/resource information,
-  // and (via the Platform-by-Value API) the pointer is not guaranteed to be
-  // tracked in Umpire's allocation map, so we cannot look up a device id the
-  // way memset_impl() does. This targets the OpenMP *current default
-  // device* (i.e. the implicit device selected by omp_set_default_device()/
-  // OMP_DEFAULT_DEVICE), matching the runtime's default `omp target` device
-  // selection rules.
-  template <typename T>
-  static void exec(T* ptr, T val, std::size_t len) {
-    if (!ptr || len == 0) {
-      return;
-    }
-
-    // OpenMP target parallel loop (implicit default device)
-    #pragma omp target teams distribute parallel for is_device_ptr(ptr)
-    for (std::size_t i = 0; i < len; i++) {
-      ptr[i] = val;
-    }
+  // The target device is derived from the pointer's Umpire allocation record
+  // (as memset_impl() does), so the kernel runs on the device that owns the
+  // memory rather than the OpenMP default device.
+  template <typename T, typename V>
+  static void exec(T* ptr, V val, std::size_t len) {
+    detail::omp_target_impl::device_memset_impl(ptr, static_cast<T>(val), len);
   }
 
-  // Async version: unlike the synchronous overload above, a Resource *is*
-  // available here, so target its device explicitly (mirrors
-  // OpenMPTargetMemsetOperation's device(...) clause).
-  template <typename T>
+  // Async version: waits on the resource's pending work, then runs
+  // synchronously on the pointer's device (see "OpenMP Target Async
+  // Limitations" above).
+  template <typename T, typename V>
   static camp::resources::EventProxy<camp::resources::Resource> exec(
-      T* ptr, T val, std::size_t len, camp::resources::Resource& res) {
-    int device = detail::get_device(res);
-
-    if (ptr && len > 0) {
-      #pragma omp target teams distribute parallel for is_device_ptr(ptr) device(device)
-      for (std::size_t i = 0; i < len; i++) {
-        ptr[i] = val;
-      }
-    }
-
+      T* ptr, V val, std::size_t len, camp::resources::Resource& res) {
+    detail::omp_target_impl::wait_for_resource(res);
+    detail::omp_target_impl::device_memset_impl(ptr, static_cast<T>(val), len);
     return camp::resources::EventProxy<camp::resources::Resource>{res};
   }
 };

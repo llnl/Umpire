@@ -77,7 +77,13 @@ inline sycl::queue& get_queue_for_ptr(const void* ptr)
 } // namespace detail
 
 // SYCL implementation helpers
-namespace {
+//
+// These live in a backend-specific namespace (rather than an anonymous one in
+// umpire::op) so they cannot collide with the identically-shaped helpers in
+// the other backend headers (e.g. op/openmp_target.hpp) when several backends
+// are enabled in the same build.
+namespace detail {
+namespace sycl_impl {
 // Error handling for SYCL operations
 // Note: the caught exception must not be named `e` -- UMPIRE_ERROR declares a
 // local `e` internally, and the message expression would self-reference it.
@@ -87,6 +93,20 @@ inline void sycl_error_check(sycl::event event, const char* message) {
   } catch (const sycl::exception& ex) {
     UMPIRE_ERROR(runtime_error, message + std::string(": ") + std::string(ex.what()));
   }
+}
+
+// Prepare to run an async op on an allocation-bound queue
+//
+// USM pointers are only valid in the sycl::context they were allocated in, so
+// the async ops below run on the queue bound to the allocation (see
+// detail::get_queue_for_ptr) rather than on `res`'s queue, which may belong to
+// a different context. Since the op then does not run on `res`'s in-order
+// queue, first validate `res` and wait on its pending work so the op is
+// ordered after it (matching the old MemoryOperation::transform_async /
+// apply_async pattern).
+inline void wait_for_resource(camp::resources::Resource& res) {
+  detail::get_queue(res);
+  res.get_event().wait();
 }
 
 // Synchronous copy implementation
@@ -108,17 +128,17 @@ inline void copy_impl(T* src_ptr, T* dst_ptr, std::size_t count, const void* que
 }
 
 // Asynchronous copy implementation
+//
+// As with copy_impl, the copy runs on the queue bound to the allocation that
+// owns `queue_ptr` (the SYCL-device side of the copy), not on `res`'s queue.
 template <typename T>
 inline camp::resources::EventProxy<camp::resources::Resource> copy_async_impl(
     T* src_ptr, T* dst_ptr, std::size_t count, camp::resources::Resource& res,
-    sycl::usm::alloc alloc_type) {
-
-  std::size_t size = detail::get_size<T>(count);
-  sycl::queue& queue = detail::get_queue(res);
-  // camp's EventProxy carries the resource, not an individual sycl::event
-  // (matching the CUDA/HIP async impls); the resource's in-order queue
-  // provides ordering for the returned proxy.
-  queue.memcpy(dst_ptr, src_ptr, size);
+    const void* queue_ptr) {
+  wait_for_resource(res);
+  // Block until complete: the work is not on `res`'s queue, so the returned
+  // EventProxy (which tracks `res`) could not otherwise represent it.
+  copy_impl(src_ptr, dst_ptr, count, queue_ptr);
 
   return camp::resources::EventProxy<camp::resources::Resource>{res};
 }
@@ -138,14 +158,13 @@ inline void memset_impl(T* ptr, int val, std::size_t count) {
   sycl_error_check(event, "SYCL memset failed");
 }
 
-// Asynchronous memset implementation
+// Asynchronous memset implementation (runs on the allocation-bound queue)
 template <typename T>
 inline camp::resources::EventProxy<camp::resources::Resource> memset_async_impl(
     T* ptr, int val, std::size_t count, camp::resources::Resource& res) {
-
-  std::size_t size = detail::get_size<T>(count);
-  sycl::queue& queue = detail::get_queue(res);
-  queue.memset(ptr, val, size);
+  wait_for_resource(res);
+  // Block until complete: the EventProxy tracks `res`, not the allocation's queue.
+  memset_impl(ptr, val, count);
 
   return camp::resources::EventProxy<camp::resources::Resource>{res};
 }
@@ -154,20 +173,24 @@ inline camp::resources::EventProxy<camp::resources::Resource> memset_async_impl(
 //
 // Note: `device` is accepted for interface symmetry with the other platforms'
 // prefetch signatures, but is not used to select a target device here -- the
-// prefetch is always issued on `res`'s bound queue, so it targets that queue's
-// device. Unlike CUDA/HIP, SYCL's queue::prefetch() does not take a device
-// argument; the queue itself is already bound to a specific device.
+// prefetch is issued on the queue bound to `ptr`'s allocation (matching the
+// old SyclMemPrefetchOperation), so it targets that queue's device. Unlike
+// CUDA/HIP, SYCL's queue::prefetch() does not take a device argument; the
+// queue itself is already bound to a specific device.
 template <typename T>
 inline camp::resources::EventProxy<camp::resources::Resource> prefetch_async_impl(
     T* ptr, int UMPIRE_UNUSED_ARG(device), std::size_t count, camp::resources::Resource& res) {
 
   std::size_t size = detail::get_size<T>(count);
-  sycl::queue& queue = detail::get_queue(res);
-  queue.prefetch(ptr, size);
+  wait_for_resource(res);
+  sycl::queue& queue = detail::get_queue_for_ptr(ptr);
+  // Block until complete: the EventProxy tracks `res`, not the allocation's queue.
+  sycl_error_check(queue.prefetch(ptr, size), "SYCL prefetch failed");
 
   return camp::resources::EventProxy<camp::resources::Resource>{res};
 }
-} // namespace
+} // namespace sycl_impl
+} // namespace detail
 
 // Device-to-device copy specialization
 template<>
@@ -176,13 +199,14 @@ struct copy<resource::sycl_platform, resource::sycl_platform> {
   static void exec(T* src_ptr, T* dst_ptr, std::size_t len) {
     // Both pointers are SYCL-device allocations; use the destination's bound
     // queue, matching the old SyclCopyOperation's use of dst_allocation's queue.
-    copy_impl(src_ptr, dst_ptr, len, dst_ptr);
+    detail::sycl_impl::copy_impl(src_ptr, dst_ptr, len, dst_ptr);
   }
 
   template <typename T>
   static camp::resources::EventProxy<camp::resources::Resource> exec(
       T* src_ptr, T* dst_ptr, std::size_t len, camp::resources::Resource& res) {
-    return copy_async_impl(src_ptr, dst_ptr, len, res, sycl::usm::alloc::device);
+    // Use the destination's bound queue, as in the sync exec above.
+    return detail::sycl_impl::copy_async_impl(src_ptr, dst_ptr, len, res, dst_ptr);
   }
 };
 
@@ -193,13 +217,14 @@ struct copy<resource::host_platform, resource::sycl_platform> {
   static void exec(T* src_ptr, T* dst_ptr, std::size_t len) {
     // dst_ptr is the SYCL-device allocation; use its bound queue, matching the
     // old SyclCopyToOperation's use of dst_allocation's queue.
-    copy_impl(src_ptr, dst_ptr, len, dst_ptr);
+    detail::sycl_impl::copy_impl(src_ptr, dst_ptr, len, dst_ptr);
   }
 
   template <typename T>
   static camp::resources::EventProxy<camp::resources::Resource> exec(
       T* src_ptr, T* dst_ptr, std::size_t len, camp::resources::Resource& res) {
-    return copy_async_impl(src_ptr, dst_ptr, len, res, sycl::usm::alloc::host);
+    // dst_ptr is the SYCL-device allocation (see sync exec above).
+    return detail::sycl_impl::copy_async_impl(src_ptr, dst_ptr, len, res, dst_ptr);
   }
 };
 
@@ -210,13 +235,14 @@ struct copy<resource::sycl_platform, resource::host_platform> {
   static void exec(T* src_ptr, T* dst_ptr, std::size_t len) {
     // src_ptr is the SYCL-device allocation; use its bound queue, matching the
     // old SyclCopyFromOperation's use of src_allocation's queue.
-    copy_impl(src_ptr, dst_ptr, len, src_ptr);
+    detail::sycl_impl::copy_impl(src_ptr, dst_ptr, len, src_ptr);
   }
 
   template <typename T>
   static camp::resources::EventProxy<camp::resources::Resource> exec(
       T* src_ptr, T* dst_ptr, std::size_t len, camp::resources::Resource& res) {
-    return copy_async_impl(src_ptr, dst_ptr, len, res, sycl::usm::alloc::host);
+    // src_ptr is the SYCL-device allocation (see sync exec above).
+    return detail::sycl_impl::copy_async_impl(src_ptr, dst_ptr, len, res, src_ptr);
   }
 };
 
@@ -225,13 +251,13 @@ template<>
 struct memset<resource::sycl_platform> {
   template <typename T>
   static void exec(T* ptr, int val, std::size_t len) {
-    memset_impl(ptr, val, len);
+    detail::sycl_impl::memset_impl(ptr, val, len);
   }
   
   template <typename T>
   static camp::resources::EventProxy<camp::resources::Resource> exec(
       T* ptr, int val, std::size_t len, camp::resources::Resource& res) {
-    return memset_async_impl(ptr, val, len, res);
+    return detail::sycl_impl::memset_async_impl(ptr, val, len, res);
   }
 };
 
@@ -259,7 +285,7 @@ struct prefetch<resource::sycl_platform> {
   template <typename T>
   static camp::resources::EventProxy<camp::resources::Resource> exec(
       T* ptr, int device, std::size_t len, camp::resources::Resource& res) {
-    return prefetch_async_impl(ptr, device, len, res);
+    return detail::sycl_impl::prefetch_async_impl(ptr, device, len, res);
   }
 };
 
@@ -272,8 +298,8 @@ void device_memset_sycl(T* ptr, T value, std::size_t count, sycl::queue& queue);
 // device_memset specialization
 template<>
 struct device_memset<resource::sycl_platform> {
-  template <typename T>
-  static void exec(T* /*ptr*/, T /*val*/, std::size_t /*len*/) {
+  template <typename T, typename V>
+  static void exec(T* /*ptr*/, V /*val*/, std::size_t /*len*/) {
     // SYCL device_memset requires a queue context to execute properly.
     // Without a resource parameter, we cannot determine which device/queue to use.
     // Use the async version with a Resource parameter instead.
@@ -283,11 +309,21 @@ struct device_memset<resource::sycl_platform> {
   }
 
   // Async version with resource
-  template <typename T>
+  //
+  // The value type V may differ from the element type T (e.g. an int literal
+  // for a double* buffer), so it is converted to T before launching the kernel.
+  // The kernel runs on the queue bound to ptr's allocation (USM pointers are
+  // only valid in their allocating context), after waiting on res's pending
+  // work; device_memset_sycl blocks until completion, so the returned
+  // EventProxy (which tracks res) represents completed work.
+  template <typename T, typename V>
   static camp::resources::EventProxy<camp::resources::Resource> exec(
-      T* ptr, T val, std::size_t len, camp::resources::Resource& res) {
-    sycl::queue& queue = detail::get_queue(res);
-    detail::device_memset_sycl(ptr, val, len, queue);
+      T* ptr, V val, std::size_t len, camp::resources::Resource& res) {
+    detail::sycl_impl::wait_for_resource(res);
+    if (ptr && len > 0) {
+      sycl::queue& queue = detail::get_queue_for_ptr(ptr);
+      detail::device_memset_sycl(ptr, static_cast<T>(val), len, queue);
+    }
     return camp::resources::EventProxy<camp::resources::Resource>{res};
   }
 };

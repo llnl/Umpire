@@ -25,7 +25,7 @@ void device_memset_sycl(T* ptr, T value, std::size_t count, sycl::queue& queue)
   // Wait for completion (synchronous operation), consistent with the
   // wait_and_throw()-based error handling used elsewhere in the new SYCL ops
   // (see sycl_error_check in sycl.hpp).
-  sycl_error_check(event, "SYCL device_memset failed");
+  sycl_impl::sycl_error_check(event, "SYCL device_memset failed");
 }
 
 // Explicit template instantiations for common types

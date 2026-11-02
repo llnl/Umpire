@@ -4,11 +4,13 @@
 #include <functional>
 #include <optional>
 #include <stdexcept>
+#include <string>
 
 #include "camp/resource.hpp"
 #include "umpire/Allocator.hpp"
 #include "umpire/ResourceManager.hpp"
 #include "umpire/config.hpp"
+#include "umpire/util/error.hpp"
 
 namespace umpire {
 namespace op {
@@ -71,13 +73,15 @@ private:
                                                                                                    \
     static void exec(void*, int, std::size_t)                                                      \
     {                                                                                              \
-      throw std::runtime_error("Memory advice not supported for this platform");                   \
+      UMPIRE_ERROR(runtime_error,                                                                  \
+                   std::string{"Memory advice "} + name_str + " not supported for this platform"); \
     }                                                                                              \
                                                                                                    \
     static camp::resources::EventProxy<camp::resources::Resource> exec(void*, int, std::size_t,    \
                                                                        camp::resources::Resource&) \
     {                                                                                              \
-      throw std::runtime_error("Memory advice not supported for this platform");                   \
+      UMPIRE_ERROR(runtime_error,                                                                  \
+                   std::string{"Memory advice "} + name_str + " not supported for this platform"); \
     }                                                                                              \
   };
 

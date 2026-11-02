@@ -36,8 +36,8 @@ static void BM_ResourceManager_Copy(benchmark::State& state, const std::string& 
   std::memset(src_ptr, 0xAA, size);
 
   for (auto _ : state) {
-    // Original ResourceManager approach
-    rm.copy(src_ptr, dst_ptr, size);
+    // Original ResourceManager approach (deprecated rm.copy takes (dst, src))
+    rm.copy(dst_ptr, src_ptr, size);
     benchmark::DoNotOptimize(dst_ptr);
     benchmark::ClobberMemory();
   }

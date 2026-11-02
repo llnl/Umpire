@@ -170,6 +170,10 @@ if (UMPIRE_ENABLE_BENCHMARKS)
     SOURCES op/copy_performance_benchmark.cpp
     DEPENDS_ON ${benchmark_depends})
 
+  blt_add_target_compile_flags(
+    TO copy_performance_benchmark
+    FLAGS ${UMPIRE_DISABLE_DEPRECATED_WARNINGS_FLAG})
+
   blt_add_benchmark(
     NAME copy_performance_benchmark
     COMMAND copy_performance_benchmark)
