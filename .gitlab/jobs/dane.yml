@@ -27,30 +27,36 @@
 gcc_11_2_1_numa:
   variables:
     SPEC: "~shared +fortran +numa +tools tests=basic %gcc@=11.2.1"
+    RAD_BAT_HOST_CONFIG_NAME: "dane-gcc_11_2_1_numa.cmake"
   extends: .job_on_dane
 
 clang_14_0_6_gcc_11_2_1_sqlite_experimental:
   variables:
     SPEC: "~shared +sqlite_experimental +tools tests=basic %clang-14-gcc-11"
+    RAD_BAT_HOST_CONFIG_NAME: "dane-clang_14_0_6_gcc_11_2_1_sqlite_experimental.cmake"
   extends: .job_on_dane
 
 # Develop builds against specific tpl version.
 clang_14_0_6_gcc_11_2_1_tpls:
   variables:
     SPEC: "~shared +fortran +tools tests=basic %clang-14-gcc-11"
+    RAD_BAT_HOST_CONFIG_NAME: "dane-clang_14_0_6_gcc_11_2_1_tpls.cmake"
   extends: .job_on_dane
 
 gcc_11_2_1_tpls:
   variables:
     SPEC: "~shared +fortran +tools tests=basic %gcc@=11.2.1"
+    RAD_BAT_HOST_CONFIG_NAME: "dane-gcc_11_2_1_tpls.cmake"
   extends: .job_on_dane
 
 gcc_11_2_1_ipc_no_mpi:
   variables:
     SPEC: "~shared +ipc_shmem tests=basic %gcc@=11.2.1"
+    RAD_BAT_HOST_CONFIG_NAME: "dane-gcc_11_2_1_ipc_no_mpi.cmake"
   extends: .job_on_dane
 
 gcc_10_3_1_mpi3_and_ipc_shmem:
   variables:
     SPEC: "~shared +mpi3_shmem +ipc_shmem +mpi tests=basic %gcc@=10.3.1 ^mvapich2"
+    RAD_BAT_HOST_CONFIG_NAME: "dane-gcc_10_3_1_mpi3_and_ipc_shmem.cmake"
   extends: .job_on_dane

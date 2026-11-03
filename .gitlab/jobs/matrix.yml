@@ -20,6 +20,7 @@
 clang_18_1_8_gcc_13_cuda_12_6_0:
   variables:
     SPEC: "${PROJECT_MATRIX_VARIANTS} +deviceconst %clang-18-gcc-13 ^cmake@3.25.2 ^cuda@12.6.0+allow-unsupported-compilers ${PROJECT_MATRIX_DEPS}"
+    RAD_BAT_HOST_CONFIG_NAME: "matrix-clang_18_1_8_gcc_13_cuda_12_6_0.cmake"
   extends: .job_on_matrix
 
 ############
