@@ -155,6 +155,29 @@ TEST(Memset, DifferentValues)
   allocator.deallocate(ptr);
 }
 
+#if defined(UMPIRE_ENABLE_BOUNDS_CHECKS)
+// Test that typed memset bounds checks use len * sizeof(T), not raw len
+TEST(Memset, TypedOutOfBounds)
+{
+  constexpr std::size_t num_elements = 16;
+
+  auto& rm = umpire::ResourceManager::getInstance();
+  auto allocator = rm.getAllocator("HOST");
+
+  // Allocate buffer of num_elements doubles
+  double* ptr = static_cast<double*>(allocator.allocate(num_elements * sizeof(double)));
+
+  // In-bounds typed memset succeeds
+  ASSERT_NO_THROW(umpire::memset(ptr, 0, num_elements));
+
+  // One element past the end overruns the buffer by sizeof(double) bytes
+  ASSERT_THROW(umpire::memset(ptr, 0, num_elements + 1), umpire::runtime_error);
+
+  // Cleanup
+  allocator.deallocate(ptr);
+}
+#endif // UMPIRE_ENABLE_BOUNDS_CHECKS
+
 #if defined(UMPIRE_ENABLE_CUDA)
 TEST(Memset, CudaMemset)
 {

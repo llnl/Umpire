@@ -33,10 +33,10 @@ std::optional<umpire::Allocator> try_get_allocator(umpire::ResourceManager& rm, 
 
 TEST(SyclOps, DeviceToDeviceCopySync) {
   auto& rm = umpire::ResourceManager::getInstance();
-  auto sycl_alloc = try_get_allocator(rm, "SYCL");
+  auto sycl_alloc = try_get_allocator(rm, "DEVICE");
 
   if (!sycl_alloc) {
-    GTEST_SKIP() << "No SYCL allocator available in this build";
+    GTEST_SKIP() << "No SYCL DEVICE allocator available in this build";
   }
 
   constexpr std::size_t num_bytes = 1024;
@@ -73,10 +73,10 @@ TEST(SyclOps, DeviceToDeviceCopySync) {
 
 TEST(SyclOps, DeviceToDeviceCopyAsync) {
   auto& rm = umpire::ResourceManager::getInstance();
-  auto sycl_alloc = try_get_allocator(rm, "SYCL");
+  auto sycl_alloc = try_get_allocator(rm, "DEVICE");
 
   if (!sycl_alloc) {
-    GTEST_SKIP() << "No SYCL allocator available in this build";
+    GTEST_SKIP() << "No SYCL DEVICE allocator available in this build";
   }
 
   constexpr std::size_t num_bytes = 2048;
@@ -118,10 +118,10 @@ TEST(SyclOps, DeviceToDeviceCopyAsync) {
 
 TEST(SyclOps, HostToDeviceCopySync) {
   auto& rm = umpire::ResourceManager::getInstance();
-  auto sycl_alloc = try_get_allocator(rm, "SYCL");
+  auto sycl_alloc = try_get_allocator(rm, "DEVICE");
 
   if (!sycl_alloc) {
-    GTEST_SKIP() << "No SYCL allocator available in this build";
+    GTEST_SKIP() << "No SYCL DEVICE allocator available in this build";
   }
 
   constexpr std::size_t num_bytes = 512;
@@ -154,10 +154,10 @@ TEST(SyclOps, HostToDeviceCopySync) {
 
 TEST(SyclOps, HostToDeviceCopyAsync) {
   auto& rm = umpire::ResourceManager::getInstance();
-  auto sycl_alloc = try_get_allocator(rm, "SYCL");
+  auto sycl_alloc = try_get_allocator(rm, "DEVICE");
 
   if (!sycl_alloc) {
-    GTEST_SKIP() << "No SYCL allocator available in this build";
+    GTEST_SKIP() << "No SYCL DEVICE allocator available in this build";
   }
 
   constexpr std::size_t num_bytes = 1024;
@@ -194,10 +194,10 @@ TEST(SyclOps, HostToDeviceCopyAsync) {
 
 TEST(SyclOps, DeviceToHostCopySync) {
   auto& rm = umpire::ResourceManager::getInstance();
-  auto sycl_alloc = try_get_allocator(rm, "SYCL");
+  auto sycl_alloc = try_get_allocator(rm, "DEVICE");
 
   if (!sycl_alloc) {
-    GTEST_SKIP() << "No SYCL allocator available in this build";
+    GTEST_SKIP() << "No SYCL DEVICE allocator available in this build";
   }
 
   constexpr std::size_t num_elements = 256;
@@ -230,10 +230,10 @@ TEST(SyclOps, DeviceToHostCopySync) {
 
 TEST(SyclOps, DeviceToHostCopyAsync) {
   auto& rm = umpire::ResourceManager::getInstance();
-  auto sycl_alloc = try_get_allocator(rm, "SYCL");
+  auto sycl_alloc = try_get_allocator(rm, "DEVICE");
 
   if (!sycl_alloc) {
-    GTEST_SKIP() << "No SYCL allocator available in this build";
+    GTEST_SKIP() << "No SYCL DEVICE allocator available in this build";
   }
 
   constexpr std::size_t num_elements = 128;
@@ -274,10 +274,10 @@ TEST(SyclOps, DeviceToHostCopyAsync) {
 
 TEST(SyclOps, MemsetSync) {
   auto& rm = umpire::ResourceManager::getInstance();
-  auto sycl_alloc = try_get_allocator(rm, "SYCL");
+  auto sycl_alloc = try_get_allocator(rm, "DEVICE");
 
   if (!sycl_alloc) {
-    GTEST_SKIP() << "No SYCL allocator available in this build";
+    GTEST_SKIP() << "No SYCL DEVICE allocator available in this build";
   }
 
   constexpr std::size_t num_bytes = 2048;
@@ -304,10 +304,10 @@ TEST(SyclOps, MemsetSync) {
 
 TEST(SyclOps, MemsetAsync) {
   auto& rm = umpire::ResourceManager::getInstance();
-  auto sycl_alloc = try_get_allocator(rm, "SYCL");
+  auto sycl_alloc = try_get_allocator(rm, "DEVICE");
 
   if (!sycl_alloc) {
-    GTEST_SKIP() << "No SYCL allocator available in this build";
+    GTEST_SKIP() << "No SYCL DEVICE allocator available in this build";
   }
 
   constexpr std::size_t num_bytes = 4096;
@@ -342,10 +342,10 @@ TEST(SyclOps, MemsetAsync) {
 
 TEST(SyclOps, DeviceMemsetTypedInt) {
   auto& rm = umpire::ResourceManager::getInstance();
-  auto sycl_alloc = try_get_allocator(rm, "SYCL");
+  auto sycl_alloc = try_get_allocator(rm, "DEVICE");
 
   if (!sycl_alloc) {
-    GTEST_SKIP() << "No SYCL allocator available in this build";
+    GTEST_SKIP() << "No SYCL DEVICE allocator available in this build";
   }
 
   constexpr std::size_t num_elements = 512;
@@ -377,10 +377,10 @@ TEST(SyclOps, DeviceMemsetTypedInt) {
 
 TEST(SyclOps, DeviceMemsetTypedFloat) {
   auto& rm = umpire::ResourceManager::getInstance();
-  auto sycl_alloc = try_get_allocator(rm, "SYCL");
+  auto sycl_alloc = try_get_allocator(rm, "DEVICE");
 
   if (!sycl_alloc) {
-    GTEST_SKIP() << "No SYCL allocator available in this build";
+    GTEST_SKIP() << "No SYCL DEVICE allocator available in this build";
   }
 
   constexpr std::size_t num_elements = 256;
@@ -416,10 +416,11 @@ TEST(SyclOps, DeviceMemsetTypedFloat) {
 
 TEST(SyclOps, PrefetchSync) {
   auto& rm = umpire::ResourceManager::getInstance();
-  auto sycl_alloc = try_get_allocator(rm, "SYCL");
+  // Prefetch requires USM shared (managed) memory, so use the UM allocator.
+  auto sycl_alloc = try_get_allocator(rm, "UM");
 
   if (!sycl_alloc) {
-    GTEST_SKIP() << "No SYCL allocator available in this build";
+    GTEST_SKIP() << "No SYCL UM allocator available in this build";
   }
 
   constexpr std::size_t num_bytes = 1024;
@@ -465,10 +466,10 @@ TEST(SyclOps, PrefetchSync) {
 
 TEST(SyclOps, ZeroSizeCopy) {
   auto& rm = umpire::ResourceManager::getInstance();
-  auto sycl_alloc = try_get_allocator(rm, "SYCL");
+  auto sycl_alloc = try_get_allocator(rm, "DEVICE");
 
   if (!sycl_alloc) {
-    GTEST_SKIP() << "No SYCL allocator available in this build";
+    GTEST_SKIP() << "No SYCL DEVICE allocator available in this build";
   }
 
   void* src = sycl_alloc->allocate(1024);
@@ -483,10 +484,10 @@ TEST(SyclOps, ZeroSizeCopy) {
 
 TEST(SyclOps, ExplicitPlatformAPI) {
   auto& rm = umpire::ResourceManager::getInstance();
-  auto sycl_alloc = try_get_allocator(rm, "SYCL");
+  auto sycl_alloc = try_get_allocator(rm, "DEVICE");
 
   if (!sycl_alloc) {
-    GTEST_SKIP() << "No SYCL allocator available in this build";
+    GTEST_SKIP() << "No SYCL DEVICE allocator available in this build";
   }
 
   constexpr std::size_t num_bytes = 512;

@@ -824,7 +824,7 @@ std::enable_if_t<op::detail::supports_memory_advice<Platform>::value> unset_read
   op::unset_read_mostly<Platform>::exec(ptr, device, len);
 }
 
-#if (defined(UMPIRE_ENABLE_HIP) && HIP_VERSION_MAJOR >= 5) || defined(UMPIRE_ENABLE_CUDA)
+#if (defined(UMPIRE_ENABLE_HIP) && HIP_VERSION_MAJOR >= 5)
 template <typename Platform, typename T>
 std::enable_if_t<op::detail::supports_memory_advice<Platform>::value> set_coarse_grain(T* ptr, int device,
                                                                                        std::size_t len)

@@ -209,6 +209,56 @@ TEST(Copy, VoidVsTypedSemantics)
   allocator.deallocate(void_dst);
 }
 
+#if defined(UMPIRE_ENABLE_BOUNDS_CHECKS)
+// Test that typed copy bounds checks use len * sizeof(T), not raw len
+TEST(Copy, TypedOutOfBounds)
+{
+  constexpr std::size_t num_elements = 16;
+
+  auto& rm = umpire::ResourceManager::getInstance();
+  auto allocator = rm.getAllocator("HOST");
+
+  // Allocate source and destination buffers of num_elements doubles
+  double* source_ptr = static_cast<double*>(allocator.allocate(num_elements * sizeof(double)));
+  double* dest_ptr = static_cast<double*>(allocator.allocate(num_elements * sizeof(double)));
+
+  // In-bounds typed copy succeeds
+  ASSERT_NO_THROW(umpire::copy(source_ptr, dest_ptr, num_elements));
+
+  // One element past the end overruns both buffers by sizeof(double) bytes
+  ASSERT_THROW(umpire::copy(source_ptr, dest_ptr, num_elements + 1), umpire::runtime_error);
+
+  // Cleanup
+  allocator.deallocate(source_ptr);
+  allocator.deallocate(dest_ptr);
+}
+
+// Test that typed copy into a smaller destination is caught
+TEST(Copy, TypedOutOfBoundsSmallerDestination)
+{
+  constexpr std::size_t src_elements = 16;
+  constexpr std::size_t dst_elements = 8;
+
+  auto& rm = umpire::ResourceManager::getInstance();
+  auto allocator = rm.getAllocator("HOST");
+
+  // Allocate a source buffer larger than the destination buffer
+  double* source_ptr = static_cast<double*>(allocator.allocate(src_elements * sizeof(double)));
+  double* dest_ptr = static_cast<double*>(allocator.allocate(dst_elements * sizeof(double)));
+
+  // Copy that fits the destination succeeds
+  ASSERT_NO_THROW(umpire::copy(source_ptr, dest_ptr, dst_elements));
+
+  // Copy that fits the source but not the destination throws
+  ASSERT_THROW(umpire::copy(source_ptr, dest_ptr, dst_elements + 1), umpire::runtime_error);
+  ASSERT_THROW(umpire::copy(source_ptr, dest_ptr, src_elements), umpire::runtime_error);
+
+  // Cleanup
+  allocator.deallocate(source_ptr);
+  allocator.deallocate(dest_ptr);
+}
+#endif // UMPIRE_ENABLE_BOUNDS_CHECKS
+
 TEST(Copy, HostToHostAsync)
 {
   constexpr std::size_t size = 1024;

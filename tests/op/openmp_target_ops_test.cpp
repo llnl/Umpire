@@ -35,10 +35,10 @@ std::optional<umpire::Allocator> try_get_allocator(umpire::ResourceManager& rm, 
 
 TEST(OpenMPTargetOps, DeviceToDeviceCopySync) {
   auto& rm = umpire::ResourceManager::getInstance();
-  auto omp_alloc = try_get_allocator(rm, "OMP_TARGET");
+  auto omp_alloc = try_get_allocator(rm, "DEVICE");
 
   if (!omp_alloc) {
-    GTEST_SKIP() << "No OMP_TARGET allocator available in this build";
+    GTEST_SKIP() << "No OpenMP target DEVICE allocator available in this build";
   }
 
   constexpr std::size_t num_bytes = 1024;
@@ -79,10 +79,10 @@ TEST(OpenMPTargetOps, DeviceToDeviceCopyAsync) {
   // This test verifies API compatibility, not true async behavior
 
   auto& rm = umpire::ResourceManager::getInstance();
-  auto omp_alloc = try_get_allocator(rm, "OMP_TARGET");
+  auto omp_alloc = try_get_allocator(rm, "DEVICE");
 
   if (!omp_alloc) {
-    GTEST_SKIP() << "No OMP_TARGET allocator available in this build";
+    GTEST_SKIP() << "No OpenMP target DEVICE allocator available in this build";
   }
 
   constexpr std::size_t num_bytes = 2048;
@@ -124,10 +124,10 @@ TEST(OpenMPTargetOps, DeviceToDeviceCopyAsync) {
 
 TEST(OpenMPTargetOps, HostToDeviceCopySync) {
   auto& rm = umpire::ResourceManager::getInstance();
-  auto omp_alloc = try_get_allocator(rm, "OMP_TARGET");
+  auto omp_alloc = try_get_allocator(rm, "DEVICE");
 
   if (!omp_alloc) {
-    GTEST_SKIP() << "No OMP_TARGET allocator available in this build";
+    GTEST_SKIP() << "No OpenMP target DEVICE allocator available in this build";
   }
 
   constexpr std::size_t num_bytes = 512;
@@ -163,10 +163,10 @@ TEST(OpenMPTargetOps, HostToDeviceCopyAsync) {
   // See include/umpire/op/openmp_target.hpp lines 64-80
 
   auto& rm = umpire::ResourceManager::getInstance();
-  auto omp_alloc = try_get_allocator(rm, "OMP_TARGET");
+  auto omp_alloc = try_get_allocator(rm, "DEVICE");
 
   if (!omp_alloc) {
-    GTEST_SKIP() << "No OMP_TARGET allocator available in this build";
+    GTEST_SKIP() << "No OpenMP target DEVICE allocator available in this build";
   }
 
   constexpr std::size_t num_bytes = 1024;
@@ -203,10 +203,10 @@ TEST(OpenMPTargetOps, HostToDeviceCopyAsync) {
 
 TEST(OpenMPTargetOps, DeviceToHostCopySync) {
   auto& rm = umpire::ResourceManager::getInstance();
-  auto omp_alloc = try_get_allocator(rm, "OMP_TARGET");
+  auto omp_alloc = try_get_allocator(rm, "DEVICE");
 
   if (!omp_alloc) {
-    GTEST_SKIP() << "No OMP_TARGET allocator available in this build";
+    GTEST_SKIP() << "No OpenMP target DEVICE allocator available in this build";
   }
 
   constexpr std::size_t num_elements = 256;
@@ -242,10 +242,10 @@ TEST(OpenMPTargetOps, DeviceToHostCopyAsync) {
   // See include/umpire/op/openmp_target.hpp lines 64-80
 
   auto& rm = umpire::ResourceManager::getInstance();
-  auto omp_alloc = try_get_allocator(rm, "OMP_TARGET");
+  auto omp_alloc = try_get_allocator(rm, "DEVICE");
 
   if (!omp_alloc) {
-    GTEST_SKIP() << "No OMP_TARGET allocator available in this build";
+    GTEST_SKIP() << "No OpenMP target DEVICE allocator available in this build";
   }
 
   constexpr std::size_t num_elements = 128;
@@ -286,10 +286,10 @@ TEST(OpenMPTargetOps, DeviceToHostCopyAsync) {
 
 TEST(OpenMPTargetOps, MemsetSync) {
   auto& rm = umpire::ResourceManager::getInstance();
-  auto omp_alloc = try_get_allocator(rm, "OMP_TARGET");
+  auto omp_alloc = try_get_allocator(rm, "DEVICE");
 
   if (!omp_alloc) {
-    GTEST_SKIP() << "No OMP_TARGET allocator available in this build";
+    GTEST_SKIP() << "No OpenMP target DEVICE allocator available in this build";
   }
 
   constexpr std::size_t num_bytes = 2048;
@@ -319,10 +319,10 @@ TEST(OpenMPTargetOps, MemsetAsync) {
   // See include/umpire/op/openmp_target.hpp lines 64-80
 
   auto& rm = umpire::ResourceManager::getInstance();
-  auto omp_alloc = try_get_allocator(rm, "OMP_TARGET");
+  auto omp_alloc = try_get_allocator(rm, "DEVICE");
 
   if (!omp_alloc) {
-    GTEST_SKIP() << "No OMP_TARGET allocator available in this build";
+    GTEST_SKIP() << "No OpenMP target DEVICE allocator available in this build";
   }
 
   constexpr std::size_t num_bytes = 4096;
@@ -357,10 +357,10 @@ TEST(OpenMPTargetOps, MemsetAsync) {
 
 TEST(OpenMPTargetOps, DeviceMemsetTypedInt) {
   auto& rm = umpire::ResourceManager::getInstance();
-  auto omp_alloc = try_get_allocator(rm, "OMP_TARGET");
+  auto omp_alloc = try_get_allocator(rm, "DEVICE");
 
   if (!omp_alloc) {
-    GTEST_SKIP() << "No OMP_TARGET allocator available in this build";
+    GTEST_SKIP() << "No OpenMP target DEVICE allocator available in this build";
   }
 
   constexpr std::size_t num_elements = 512;
@@ -393,10 +393,10 @@ TEST(OpenMPTargetOps, DeviceMemsetTypedInt) {
 
 TEST(OpenMPTargetOps, ZeroSizeCopy) {
   auto& rm = umpire::ResourceManager::getInstance();
-  auto omp_alloc = try_get_allocator(rm, "OMP_TARGET");
+  auto omp_alloc = try_get_allocator(rm, "DEVICE");
 
   if (!omp_alloc) {
-    GTEST_SKIP() << "No OMP_TARGET allocator available in this build";
+    GTEST_SKIP() << "No OpenMP target DEVICE allocator available in this build";
   }
 
   void* src = omp_alloc->allocate(1024);
@@ -424,10 +424,10 @@ TEST(OpenMPTargetOps, AsyncIsSynchronousDocumented) {
   // 4. Event.wait() returns immediately
 
   auto& rm = umpire::ResourceManager::getInstance();
-  auto omp_alloc = try_get_allocator(rm, "OMP_TARGET");
+  auto omp_alloc = try_get_allocator(rm, "DEVICE");
 
   if (!omp_alloc) {
-    GTEST_SKIP() << "No OMP_TARGET allocator available in this build";
+    GTEST_SKIP() << "No OpenMP target DEVICE allocator available in this build";
   }
 
   constexpr std::size_t num_bytes = 256;

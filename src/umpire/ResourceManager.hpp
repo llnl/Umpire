@@ -311,10 +311,10 @@ class ResourceManager {
    * 
    * \deprecated Use the global umpire::memset function instead.
    */
-  [[deprecated("Use the global umpire::memset function instead")]]
+  [[deprecated("Use the global umpire::memset function instead -- NOTE: typed (non-void*) overloads take length as an ELEMENT COUNT, not bytes")]]
   void memset(void* ptr, int val, std::size_t length = 0);
 
-  [[deprecated("Use the global umpire::memset function with Resource instead")]]
+  [[deprecated("Use the global umpire::memset function with Resource instead -- NOTE: typed (non-void*) overloads take length as an ELEMENT COUNT, not bytes")]]
   camp::resources::EventProxy<camp::resources::Resource> memset(void* ptr, int val, camp::resources::Resource& ctx,
                                                                 std::size_t length = 0);
 
@@ -341,10 +341,10 @@ class ResourceManager {
    * 
    * \deprecated Use the global umpire::reallocate function instead.
    */
-  [[deprecated("Use the global umpire::reallocate function instead")]]
+  [[deprecated("Use the global umpire::reallocate function instead -- NOTE: typed (non-void*) overloads take new_size as an ELEMENT COUNT, not bytes")]]
   void* reallocate(void* current_ptr, std::size_t new_size);
 
-  [[deprecated("Use the global umpire::reallocate function with Resource instead")]]
+  [[deprecated("Use the global umpire::reallocate function with Resource instead -- NOTE: typed (non-void*) overloads take new_size as an ELEMENT COUNT, not bytes")]]
   void* reallocate(void* current_ptr, std::size_t new_size, camp::resources::Resource& ctx);
 
   /*!
@@ -362,12 +362,14 @@ class ResourceManager {
    *
    * \return Reallocated pointer.
    * 
-   * \deprecated Use the global umpire::reallocate function instead.
+   * \deprecated No Allocator-taking replacement exists yet; umpire::reallocate
+   *             uses the allocation's existing allocator (or the default
+   *             allocator when *ptr is null).
    */
-  [[deprecated("Use the global umpire::reallocate function instead")]]
+  [[deprecated("No Allocator-taking replacement exists yet: umpire::reallocate uses the allocation's existing allocator (or the DEFAULT allocator when *ptr is null) -- NOTE: typed (non-void*) overloads take new_size as an ELEMENT COUNT, not bytes")]]
   void* reallocate(void* current_ptr, std::size_t new_size, Allocator allocator);
 
-  [[deprecated("Use the global umpire::reallocate function with Resource instead")]]
+  [[deprecated("No Allocator-taking replacement exists yet: umpire::reallocate with Resource uses the allocation's existing allocator (or the DEFAULT allocator when *ptr is null) -- NOTE: typed (non-void*) overloads take new_size as an ELEMENT COUNT, not bytes")]]
   void* reallocate(void* current_ptr, std::size_t new_size, Allocator allocator, camp::resources::Resource& ctx);
 
   /*!
@@ -399,7 +401,7 @@ class ResourceManager {
    * 
    * \deprecated Use the global umpire::prefetch function instead.
    */
-  [[deprecated("Use the global umpire::prefetch function instead")]]
+  [[deprecated("Use the global umpire::prefetch function instead -- NOTE: it takes an explicit size, which for typed (non-void*) pointers is an ELEMENT COUNT, not bytes")]]
   camp::resources::EventProxy<camp::resources::Resource> prefetch(void* ptr, int device,
                                                                   camp::resources::Resource& ctx);
 

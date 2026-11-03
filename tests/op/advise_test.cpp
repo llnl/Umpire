@@ -265,51 +265,6 @@ TEST(Advise, ExplicitCudaAdvise)
     GTEST_SKIP() << "Unified Memory not available: " << e.what();
   }
 }
-
-#if defined(CUDA_VERSION) && CUDA_VERSION >= 8000
-TEST(Advise, CudaCoarseGrain)
-{
-  constexpr std::size_t size = 1024;
-
-  auto& rm = umpire::ResourceManager::getInstance();
-
-  // Check if we have managed memory support
-  try {
-    auto um_allocator = rm.getAllocator("UM");
-    auto host_allocator = rm.getAllocator("HOST");
-
-    // Allocate managed memory
-    void* um_ptr = um_allocator.allocate(size);
-
-    // Allocate host buffer for verification
-    unsigned char* host_ptr = static_cast<unsigned char*>(host_allocator.allocate(size));
-
-    // Fill managed memory with test data
-    std::memset(um_ptr, 0x99, size);
-
-    // Set coarse grain access pattern (CUDA 8.0+)
-    EXPECT_NO_THROW(umpire::set_coarse_grain(um_ptr, 0, size));
-
-    // Copy to host memory to verify data integrity
-    std::memcpy(host_ptr, um_ptr, size);
-
-    // Verify data is intact after advise
-    for (std::size_t i = 0; i < size; ++i) {
-      ASSERT_EQ(host_ptr[i], 0x99) << "CUDA set_coarse_grain corrupted data at byte " << i;
-    }
-
-    // Test unsetting coarse grain
-    EXPECT_NO_THROW(umpire::unset_coarse_grain(um_ptr, 0, size));
-
-    // Cleanup
-    um_allocator.deallocate(um_ptr);
-    host_allocator.deallocate(host_ptr);
-  } catch (const std::runtime_error& e) {
-    // If UM allocator is not available, skip this test
-    GTEST_SKIP() << "Unified Memory not available: " << e.what();
-  }
-}
-#endif // CUDA_VERSION >= 8000
 #endif // UMPIRE_ENABLE_CUDA
 
 #if defined(UMPIRE_ENABLE_HIP)

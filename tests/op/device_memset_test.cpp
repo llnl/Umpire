@@ -16,7 +16,8 @@
 #include "umpire/op.hpp"
 
 namespace {
-std::optional<umpire::Allocator> try_get_allocator(umpire::ResourceManager& rm, const char* name)
+// [[maybe_unused]]: on SYCL-only builds every caller below is compiled out.
+[[maybe_unused]] std::optional<umpire::Allocator> try_get_allocator(umpire::ResourceManager& rm, const char* name)
 {
   try {
     return rm.getAllocator(name);
@@ -26,6 +27,11 @@ std::optional<umpire::Allocator> try_get_allocator(umpire::ResourceManager& rm, 
 }
 } // namespace
 
+// The generic tests below use the synchronous umpire::device_memset, which
+// throws by design on SYCL (it requires a resource context; see op/sycl.hpp).
+// SYCL coverage of device_memset lives in sycl_ops_test.cpp via the async
+// resource-taking overload.
+#if !defined(UMPIRE_ENABLE_SYCL)
 TEST(DeviceMemset, TypedDeviceMemsetInt)
 {
   constexpr std::size_t num_elements = 256;
@@ -197,6 +203,7 @@ TEST(DeviceMemset, DifferentValues)
   device_allocator->deallocate(device_ptr);
   host_allocator.deallocate(host_ptr);
 }
+#endif // !UMPIRE_ENABLE_SYCL
 
 #if defined(UMPIRE_ENABLE_CUDA)
 TEST(DeviceMemset, CudaDeviceMemset)
