@@ -12,6 +12,7 @@
 #include "umpire/event/event.hpp"
 #include "umpire/event/recorder_factory.hpp"
 #include "umpire/strategy/ThreadSafeAllocator.hpp"
+#include "umpire/util/AllocationHeader.hpp"
 #include "umpire/util/Macros.hpp"
 #include "umpire/util/error.hpp"
 
@@ -25,6 +26,30 @@ inline void* Allocator::do_allocate(std::size_t bytes)
 
   UMPIRE_LOG(Debug, "(" << bytes << ")");
 
+#if defined(UMPIRE_ENABLE_INTROSPECTION_HEADER)
+  if (m_tracking) {
+    // Zero-byte allocations also carry a header so that the owning strategy
+    // can always be recovered from the pointer
+    try {
+      void* base_ptr{m_allocator->allocate(bytes + util::allocation_header_size)};
+      ret = util::write_allocation_header(base_ptr, bytes, m_allocator);
+    } catch (umpire::out_of_memory_error& e) {
+      e.set_allocator_id(this->getId());
+      e.set_requested_size(bytes);
+      throw;
+    }
+  } else if (0 == bytes) {
+    ret = allocateNull();
+  } else {
+    try {
+      ret = m_allocator->allocate(bytes);
+    } catch (umpire::out_of_memory_error& e) {
+      e.set_allocator_id(this->getId());
+      e.set_requested_size(bytes);
+      throw;
+    }
+  }
+#else
   if (0 == bytes) {
     ret = allocateNull();
   } else {
@@ -36,6 +61,7 @@ inline void* Allocator::do_allocate(std::size_t bytes)
       throw;
     }
   }
+#endif
 
   if (m_tracking) {
     registerAllocation(ret, bytes, m_allocator);
@@ -85,11 +111,24 @@ inline void* Allocator::do_named_allocate(const std::string& name, std::size_t b
 
   UMPIRE_LOG(Debug, "(" << bytes << ")");
 
+#if defined(UMPIRE_ENABLE_INTROSPECTION_HEADER)
+  if (m_tracking) {
+    // Zero-byte allocations also carry a header so that the owning strategy
+    // can always be recovered from the pointer
+    void* base_ptr{m_allocator->allocate_named(name, bytes + util::allocation_header_size)};
+    ret = util::write_allocation_header(base_ptr, bytes, m_allocator);
+  } else if (0 == bytes) {
+    ret = allocateNull();
+  } else {
+    ret = m_allocator->allocate_named(name, bytes);
+  }
+#else
   if (0 == bytes) {
     ret = allocateNull();
   } else {
     ret = m_allocator->allocate_named(name, bytes);
   }
+#endif
 
   if (m_tracking) {
     registerAllocation(ret, bytes, m_allocator, name);
@@ -108,11 +147,24 @@ inline void* Allocator::do_resource_allocate(std::size_t bytes, camp::resources:
 
   UMPIRE_LOG(Debug, "(" << bytes << ")");
 
+#if defined(UMPIRE_ENABLE_INTROSPECTION_HEADER)
+  if (m_tracking) {
+    // Zero-byte allocations also carry a header so that the owning strategy
+    // can always be recovered from the pointer
+    void* base_ptr{m_allocator->allocate_resource(bytes + util::allocation_header_size, r)};
+    ret = util::write_allocation_header(base_ptr, bytes, m_allocator);
+  } else if (0 == bytes) {
+    ret = allocateNull();
+  } else {
+    ret = m_allocator->allocate_resource(bytes, r);
+  }
+#else
   if (0 == bytes) {
     ret = allocateNull();
   } else {
     ret = m_allocator->allocate_resource(bytes, r);
   }
+#endif
 
   if (m_tracking) {
     registerAllocation(ret, bytes, m_allocator);
@@ -133,6 +185,21 @@ inline void Allocator::do_deallocate(void* ptr)
     UMPIRE_LOG(Info, "Deallocating a null pointer (This behavior is intentionally allowed and ignored)");
     return;
   } else {
+#if defined(UMPIRE_ENABLE_INTROSPECTION_HEADER)
+    if (m_tracking) {
+      // Zero-byte allocations carry no header, so they must be checked first
+      if (deallocateNull(ptr)) {
+        deregisterNullAllocation(m_allocator);
+      } else {
+        auto record = deregisterAllocation(ptr, m_allocator);
+        m_allocator->deallocate(util::get_base_pointer(ptr), record.size + util::allocation_header_size);
+      }
+    } else {
+      if (!deallocateNull(ptr)) {
+        m_allocator->deallocate(ptr);
+      }
+    }
+#else
     if (m_tracking) {
       auto record = deregisterAllocation(ptr, m_allocator);
       if (!deallocateNull(ptr)) {
@@ -143,6 +210,7 @@ inline void Allocator::do_deallocate(void* ptr)
         m_allocator->deallocate(ptr);
       }
     }
+#endif
   }
 }
 
@@ -157,6 +225,21 @@ inline void Allocator::do_resource_deallocate(void* ptr, camp::resources::Resour
     UMPIRE_LOG(Info, "Deallocating a null pointer (This behavior is intentionally allowed and ignored)");
     return;
   } else {
+#if defined(UMPIRE_ENABLE_INTROSPECTION_HEADER)
+    if (m_tracking) {
+      // Zero-byte allocations carry no header, so they must be checked first
+      if (deallocateNull(ptr)) {
+        deregisterNullAllocation(m_allocator);
+      } else {
+        auto record = deregisterAllocation(ptr, m_allocator);
+        m_allocator->deallocate_resource(util::get_base_pointer(ptr), r, record.size + util::allocation_header_size);
+      }
+    } else {
+      if (!deallocateNull(ptr)) {
+        m_allocator->deallocate_resource(ptr, r);
+      }
+    }
+#else
     if (m_tracking) {
       auto record = deregisterAllocation(ptr, m_allocator);
       if (!deallocateNull(ptr)) {
@@ -167,6 +250,7 @@ inline void Allocator::do_resource_deallocate(void* ptr, camp::resources::Resour
         m_allocator->deallocate_resource(ptr, r);
       }
     }
+#endif
   }
 }
 

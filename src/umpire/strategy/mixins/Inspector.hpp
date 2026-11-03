@@ -7,6 +7,7 @@
 #ifndef UMPIRE_Inspector_HPP
 #define UMPIRE_Inspector_HPP
 
+#include "umpire/config.hpp"
 #include "umpire/util/AllocationRecord.hpp"
 
 #include <memory>
@@ -30,6 +31,11 @@ class Inspector
 
     // Deregisters the allocation if the strategy matches, otherwise throws an error
     util::AllocationRecord deregisterAllocation(void* ptr, strategy::AllocationStrategy* strategy);
+
+#if defined(UMPIRE_ENABLE_INTROSPECTION_HEADER)
+    // Zero-byte allocations carry no header, so only the strategy counters are updated
+    void deregisterNullAllocation(strategy::AllocationStrategy* strategy);
+#endif
 };
 
 } // end of namespace mixins

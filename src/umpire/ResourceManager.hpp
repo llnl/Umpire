@@ -379,6 +379,16 @@ class ResourceManager {
   strategy::AllocationStrategy* findAllocatorForId(int id);
   strategy::AllocationStrategy* getAllocationStrategy(const std::string& name);
 
+  /*!
+   * \brief Find the allocation record for the given pointer.
+   *
+   * With UMPIRE_ENABLE_INTROSPECTION_HEADER, the record is reconstructed
+   * from the allocation header into thread-local storage, so the returned
+   * pointer is a transient view that is only valid until a small number of
+   * subsequent lookups on the same thread.
+   */
+  util::AllocationRecord* findAllocationRecordInternal(void* ptr) const;
+
   bool isBuiltinAllocator(strategy::AllocationStrategy* strategy);
 
   /*!
