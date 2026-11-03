@@ -29,7 +29,6 @@
 #cmakedefine UMPIRE_ENABLE_NUMA
 #cmakedefine UMPIRE_ENABLE_OPENMP_TARGET
 #cmakedefine UMPIRE_ENABLE_PINNED
-#cmakedefine UMPIRE_ENABLE_SLIC
 #cmakedefine UMPIRE_ENABLE_SYCL
 #cmakedefine UMPIRE_ENABLE_UM
 #cmakedefine UMPIRE_ENABLE_ASAN

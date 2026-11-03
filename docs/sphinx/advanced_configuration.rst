@@ -33,7 +33,6 @@ Here is a summary of the configuration options, their default value, and meaning
     ``UMPIRE_ENABLE_LOGGING``              On                 Enable Logging within Umpire
     ``UMPIRE_ENABLE_NUMA``                 Off                Enable NUMA support
     ``UMPIRE_ENABLE_PERFORMANCE_TESTS``    Off                Build and run performance tests
-    ``UMPIRE_ENABLE_SLIC``                 Off                Enable SLIC logging
     ``UMPIRE_ENABLE_TOOLS``                Off                Enable tools like replay
     ====================================== ==========         ===========================================================================
 
@@ -91,7 +90,9 @@ These arguments are explained in more detail below:
   feature only exists for for ``HOST`` memory.
 
 * ``UMPIRE_ENABLE_LOGGING``
-  This option enables usage of Logging services for Umpire.
+  This option enables usage of Logging services for Umpire. Umpire uses the
+  spdlog library for logging. When enabled, logging behavior can be controlled
+  via environment variables at runtime (see :ref:`logging_configuration`).
 
 * ``UMPIRE_ENABLE_NUMA``
   This option enables support for NUMA. The
@@ -101,8 +102,7 @@ These arguments are explained in more detail below:
 * ``UMPIRE_ENABLE_PERFORMANCE_TESTS``
   Build and run performance tests.
 
-* ``UMPIRE_ENABLE_SLIC``
-  This option enables usage of logging services provided by SLIC.
-
 * ``UMPIRE_ENABLE_TOOLS``
-  Enable development tools for Umpire (replay, etc.).
+
+  Enable development tools for Umpire (replay, etc.)
+

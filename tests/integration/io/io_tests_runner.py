@@ -64,6 +64,12 @@ def run_io_test(test_env, file_uid, expect_logging):
 
     global errors
 
+    # Create output directory if specified
+    if 'UMPIRE_OUTPUT_DIR' in test_env:
+        output_dir = test_env['UMPIRE_OUTPUT_DIR']
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
     cmd_args = ['./io_tests']
     if expect_logging:
         cmd_args.append('--enable-logging')
@@ -89,17 +95,19 @@ def run_io_test(test_env, file_uid, expect_logging):
             print(line)
         errors = 1
     else:
-        check_output('stderr', error, b'testing error stream')
-
-        output_filename = 'umpire_io_tests.{pid}.{uid}.log'.format(uid=file_uid, pid=pid)
-
+        # Default output directory is "./" when UMPIRE_OUTPUT_DIR is not set
         if 'UMPIRE_OUTPUT_DIR' in test_env.keys():
             output_filename = '{dir}/umpire_io_tests.{pid}.{uid}.log'.format(dir=test_env['UMPIRE_OUTPUT_DIR'], uid=file_uid, pid=pid)
+        else:
+            output_filename = './umpire_io_tests.{pid}.{uid}.log'.format(uid=file_uid, pid=pid)
 
         if expect_logging:
             check_file_exists(output_filename)
             with open(output_filename, 'rb') as output_file:
+                # With spdlog, both Info and Error messages go to the log file
                 check_output(output_filename, output_file, b'testing log stream')
+            with open(output_filename, 'rb') as output_file:
+                check_output(output_filename, output_file, b'testing error stream')
         else:
             check_file_not_exists(output_filename)
 

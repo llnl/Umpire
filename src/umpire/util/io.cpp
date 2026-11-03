@@ -9,20 +9,16 @@
 
 #include <cstdlib>
 #include <fstream>
-#include <iostream>
-#include <ostream>
 #include <string>
 
 #include "umpire/config.hpp"
 #include "umpire/util/MPI.hpp"
 #include "umpire/util/Macros.hpp"
-#include "umpire/util/OutputBuffer.hpp"
 #include "umpire/util/error.hpp"
 
 #if defined(UMPIRE_ENABLE_FILESYSTEM)
 #include <filesystem>
 #else
-#include <dirent.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #endif
@@ -36,121 +32,7 @@
 #endif
 
 namespace umpire {
-
-std::ostream& log()
-{
-  static std::ostream out{std::cout.rdbuf()};
-  return out;
-}
-
-std::ostream& error()
-{
-  static std::ostream out{std::cerr.rdbuf()};
-  return out;
-}
-
 namespace util {
-
-namespace detail {
-
-OutputBuffer& s_log_buffer_accessor()
-{
-  static OutputBuffer buffer;
-  return buffer;
-}
-
-OutputBuffer& s_error_buffer_accessor()
-{
-  static OutputBuffer buffer;
-  return buffer;
-}
-
-} // namespace detail
-
-void initialize_io(const bool enable_log)
-{
-  OutputBuffer& s_log_buffer = detail::s_log_buffer_accessor();
-  OutputBuffer& s_error_buffer = detail::s_error_buffer_accessor();
-
-  s_log_buffer.setConsoleStream(nullptr);
-  s_error_buffer.setConsoleStream(&std::cerr);
-
-  log().rdbuf(&s_log_buffer);
-  error().rdbuf(&s_error_buffer);
-
-  const std::string& root_io_dir{util::get_io_output_dir()};
-  const std::string& file_basename{util::get_io_output_basename()};
-
-  const int pid{getpid()};
-
-  const std::string log_filename{make_unique_filename(root_io_dir, file_basename, pid, "log")};
-
-  const std::string error_filename{make_unique_filename(root_io_dir, file_basename, pid, "error")};
-
-  if (!directory_exists(root_io_dir)) {
-    if (MPI::isInitialized()) {
-      if (MPI::getRank() == 0) {
-#if defined(UMPIRE_ENABLE_FILESYSTEM)
-        std::filesystem::path root_io_dir_path{root_io_dir};
-
-        if (!std::filesystem::exists(root_io_dir_path) && enable_log) {
-          std::filesystem::create_directories(root_io_dir_path);
-        }
-#else
-        struct stat info;
-        if (stat(root_io_dir.c_str(), &info)) {
-          if (enable_log) {
-#ifndef WIN32
-            if (mkdir(root_io_dir.c_str(), S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH)) {
-              UMPIRE_ERROR(runtime_error, fmt::format("mkdir({}) failed", root_io_dir));
-            }
-#else
-            if (_mkdir(root_io_dir.c_str())) {
-              UMPIRE_ERROR(runtime_error, fmt::format("mkdir( \"{}\" ) failed", root_io_dir));
-            }
-#endif
-          }
-        } else if (!(S_ISDIR(info.st_mode))) {
-          UMPIRE_ERROR(runtime_error, fmt::format("{} exists and is not a directory", root_io_dir));
-        }
-#endif
-      }
-      MPI::sync();
-    } else {
-      UMPIRE_ERROR(runtime_error,
-                   "Cannot create output directory before MPI has been initialized. Please unset UMPIRE_OUTPUT_DIR in "
-                   "your environment");
-    }
-  }
-
-  if (enable_log) {
-    static std::ofstream s_log_ofstream{log_filename};
-
-    if (s_log_ofstream) {
-      s_log_buffer.setFileStream(&s_log_ofstream);
-    } else {
-      UMPIRE_ERROR(runtime_error, fmt::format("Couldn't open log file: {}", log_filename));
-    }
-  }
-
-  MPI::logMpiInfo();
-}
-
-void finalize_io()
-{
-  detail::s_log_buffer_accessor().sync();
-  detail::s_log_buffer_accessor().setConsoleStream(nullptr);
-  detail::s_log_buffer_accessor().setFileStream(nullptr);
-  detail::s_error_buffer_accessor().sync();
-  detail::s_error_buffer_accessor().setConsoleStream(nullptr);
-  detail::s_error_buffer_accessor().setFileStream(nullptr);
-}
-
-void flush_files()
-{
-  log().flush();
-  error().flush();
-}
 
 std::string make_unique_filename(const std::string& base_dir, const std::string& name, const int pid,
                                  const std::string& extension)
@@ -181,9 +63,52 @@ bool directory_exists(const std::string& path)
   if (stat(path.c_str(), &info)) {
     return false;
   } else {
+#if defined(_MSC_VER)
+    return (info.st_mode & _S_IFDIR) != 0;
+#else
     return S_ISDIR(info.st_mode);
+#endif
   }
 #endif
+}
+
+void make_io_dir(const std::string& io_dir)
+{
+  if (directory_exists(io_dir)) {
+    return;
+  }
+
+  if (MPI::isInitialized()) {
+    if (MPI::getRank() == 0) {
+#if defined(UMPIRE_ENABLE_FILESYSTEM)
+      std::filesystem::path io_dir_path{io_dir};
+
+      if (!std::filesystem::exists(io_dir_path)) {
+        std::filesystem::create_directories(io_dir_path);
+      }
+#else
+      struct stat info;
+      if (stat(io_dir.c_str(), &info)) {
+#ifndef WIN32
+        if (mkdir(io_dir.c_str(), S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH)) {
+          UMPIRE_ERROR(runtime_error, fmt::format("mkdir({}) failed", io_dir));
+        }
+#else
+        if (_mkdir(io_dir.c_str())) {
+          UMPIRE_ERROR(runtime_error, fmt::format("mkdir( \"{}\" ) failed", io_dir));
+        }
+#endif
+      } else if (!(S_ISDIR(info.st_mode))) {
+        UMPIRE_ERROR(runtime_error, fmt::format("{} exists and is not a directory", io_dir));
+      }
+#endif
+    }
+    MPI::sync();
+  } else {
+    UMPIRE_ERROR(runtime_error,
+                 "Cannot create output directory before MPI has been initialized. Please unset UMPIRE_OUTPUT_DIR in "
+                 "your environment");
+  }
 }
 
 const std::string& get_io_output_dir()

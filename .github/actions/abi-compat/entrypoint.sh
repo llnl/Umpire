@@ -7,6 +7,7 @@ git config --global --add safe.directory /github/workspace/scripts/radiuss-spack
 git config --global --add safe.directory /github/workspace/scripts/uberenv
 git config --global --add safe.directory /github/workspace/src/tpl/umpire/camp
 git config --global --add safe.directory /github/workspace/src/tpl/umpire/fmt
+git config --global --add safe.directory /github/workspace/src/tpl/umpire/spdlog
 
 git submodule update --init --recursive
 
