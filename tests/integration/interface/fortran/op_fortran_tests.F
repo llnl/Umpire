@@ -51,7 +51,6 @@ end module umpire_fortran_op_tests
 
 
 program fortran_test
-  use fruit
   use umpire_fortran_op_tests
 
   implicit none

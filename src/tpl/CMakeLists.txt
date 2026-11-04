@@ -134,6 +134,20 @@ if (NOT TARGET camp)
       SCOPE INTERFACE
       TARGET_DEFINITIONS CAMP_HAVE_HIP)
   endif()
+
+  if(UMPIRE_ENABLE_SYCL)
+    blt_add_target_definitions(
+      TO camp
+      SCOPE INTERFACE
+      TARGET_DEFINITIONS CAMP_ENABLE_SYCL)
+  endif()
+
+  if(UMPIRE_ENABLE_OPENMP_TARGET)
+    blt_add_target_definitions(
+      TO camp
+      SCOPE INTERFACE
+      TARGET_DEFINITIONS CAMP_ENABLE_TARGET_OPENMP)
+  endif()
 endif ()
 
 if (NOT TARGET ${UMPIRE_FMT_TARGET})
