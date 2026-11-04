@@ -10,13 +10,13 @@
 #include "umpire/op.hpp"
 
 #include <optional>
+#include <memory>
 #include <vector>
 
 #if defined(UMPIRE_ENABLE_SYCL)
 
 namespace {
 
-// Helper to safely get allocator without throwing if unavailable
 std::optional<umpire::Allocator> try_get_allocator(umpire::ResourceManager& rm, const char* name) {
   try {
     return rm.getAllocator(name);
@@ -44,18 +44,14 @@ TEST(SyclOps, DeviceToDeviceCopySync) {
   void* src = sycl_alloc->allocate(num_bytes);
   void* dst = sycl_alloc->allocate(num_bytes);
 
-  // Initialize source data on host
   std::vector<char> host_data(num_bytes, 42);
   void* host_buf = rm.getAllocator("HOST").allocate(num_bytes);
   std::memcpy(host_buf, host_data.data(), num_bytes);
 
-  // Copy to device source
   umpire::copy(host_buf, src, num_bytes);
 
-  // Device-to-device copy (synchronous)
   umpire::copy(src, dst, num_bytes);
 
-  // Verify by copying back to host
   std::vector<char> result(num_bytes, 0);
   void* verify_buf = rm.getAllocator("HOST").allocate(num_bytes);
   umpire::copy(dst, verify_buf, num_bytes);
@@ -84,22 +80,18 @@ TEST(SyclOps, DeviceToDeviceCopyAsync) {
   void* src = sycl_alloc->allocate(num_bytes);
   void* dst = sycl_alloc->allocate(num_bytes);
 
-  // Initialize source
   std::vector<char> host_data(num_bytes, 99);
   void* host_buf = rm.getAllocator("HOST").allocate(num_bytes);
   std::memcpy(host_buf, host_data.data(), num_bytes);
   umpire::copy(host_buf, src, num_bytes);
 
-  // Create SYCL resource for async operation
   camp::resources::Resource sycl_ctx{camp::resources::Sycl{}};
 
-  // Async device-to-device copy
   auto event = umpire::copy(src, dst, num_bytes, sycl_ctx);
 
   // SYCL has true async support - must explicitly wait
   static_cast<camp::resources::Event>(event).wait();
 
-  // Verify
   void* verify_buf = rm.getAllocator("HOST").allocate(num_bytes);
   umpire::copy(dst, verify_buf, num_bytes);
 
@@ -129,14 +121,11 @@ TEST(SyclOps, HostToDeviceCopySync) {
   void* host_src = rm.getAllocator("HOST").allocate(num_bytes);
   void* device_dst = sycl_alloc->allocate(num_bytes);
 
-  // Initialize host data
   std::vector<char> host_data(num_bytes, 77);
   std::memcpy(host_src, host_data.data(), num_bytes);
 
-  // Host-to-device copy (synchronous)
   umpire::copy(host_src, device_dst, num_bytes);
 
-  // Verify by copying back
   void* host_verify = rm.getAllocator("HOST").allocate(num_bytes);
   umpire::copy(device_dst, host_verify, num_bytes);
 
@@ -165,18 +154,14 @@ TEST(SyclOps, HostToDeviceCopyAsync) {
   void* host_src = rm.getAllocator("HOST").allocate(num_bytes);
   void* device_dst = sycl_alloc->allocate(num_bytes);
 
-  // Initialize host data
   std::vector<int> host_data(num_bytes / sizeof(int), 12345);
   std::memcpy(host_src, host_data.data(), num_bytes);
 
-  // Create SYCL resource for async operation
   camp::resources::Resource sycl_ctx{camp::resources::Sycl{}};
 
-  // Async host-to-device copy
   auto event = umpire::copy(host_src, device_dst, num_bytes, sycl_ctx);
   static_cast<camp::resources::Event>(event).wait();
 
-  // Verify
   void* host_verify = rm.getAllocator("HOST").allocate(num_bytes);
   umpire::copy(device_dst, host_verify, num_bytes);
 
@@ -206,16 +191,13 @@ TEST(SyclOps, DeviceToHostCopySync) {
   void* device_src = sycl_alloc->allocate(num_bytes);
   void* host_dst = rm.getAllocator("HOST").allocate(num_bytes);
 
-  // Initialize device data via host
   std::vector<double> host_data(num_elements, 3.14159);
   void* host_temp = rm.getAllocator("HOST").allocate(num_bytes);
   std::memcpy(host_temp, host_data.data(), num_bytes);
   umpire::copy(host_temp, device_src, num_bytes);
 
-  // Device-to-host copy (synchronous)
   umpire::copy(device_src, host_dst, num_bytes);
 
-  // Verify
   std::vector<double> result(num_elements, 0.0);
   std::memcpy(result.data(), host_dst, num_bytes);
 
@@ -242,20 +224,16 @@ TEST(SyclOps, DeviceToHostCopyAsync) {
   void* device_src = sycl_alloc->allocate(num_bytes);
   void* host_dst = rm.getAllocator("HOST").allocate(num_bytes);
 
-  // Initialize device data
   std::vector<float> host_data(num_elements, 2.71828f);
   void* host_temp = rm.getAllocator("HOST").allocate(num_bytes);
   std::memcpy(host_temp, host_data.data(), num_bytes);
   umpire::copy(host_temp, device_src, num_bytes);
 
-  // Create SYCL resource for async operation
   camp::resources::Resource sycl_ctx{camp::resources::Sycl{}};
 
-  // Async device-to-host copy
   auto event = umpire::copy(device_src, host_dst, num_bytes, sycl_ctx);
   static_cast<camp::resources::Event>(event).wait();
 
-  // Verify
   std::vector<float> result(num_elements, 0.0f);
   std::memcpy(result.data(), host_dst, num_bytes);
 
@@ -284,10 +262,8 @@ TEST(SyclOps, MemsetSync) {
 
   void* device_ptr = sycl_alloc->allocate(num_bytes);
 
-  // Memset (synchronous)
   umpire::memset(device_ptr, 0xAB, num_bytes);
 
-  // Verify by copying to host
   void* host_verify = rm.getAllocator("HOST").allocate(num_bytes);
   umpire::copy(device_ptr, host_verify, num_bytes);
 
@@ -314,14 +290,11 @@ TEST(SyclOps, MemsetAsync) {
 
   void* device_ptr = sycl_alloc->allocate(num_bytes);
 
-  // Create SYCL resource for async operation
   camp::resources::Resource sycl_ctx{camp::resources::Sycl{}};
 
-  // Async memset
   auto event = umpire::memset(device_ptr, 0x55, num_bytes, sycl_ctx);
   static_cast<camp::resources::Event>(event).wait();
 
-  // Verify
   void* host_verify = rm.getAllocator("HOST").allocate(num_bytes);
   umpire::copy(device_ptr, host_verify, num_bytes);
 
@@ -356,11 +329,9 @@ TEST(SyclOps, DeviceMemsetTypedInt) {
   // SYCL device_memset requires resource context
   camp::resources::Resource sycl_ctx{camp::resources::Sycl{}};
 
-  // Set all elements to value 42
   auto event = umpire::device_memset(device_ptr, 42, num_elements, sycl_ctx);
   static_cast<camp::resources::Event>(event).wait();
 
-  // Verify by copying to host
   void* host_verify = rm.getAllocator("HOST").allocate(num_bytes);
   umpire::copy(static_cast<void*>(device_ptr), host_verify, num_bytes);
 
@@ -391,11 +362,9 @@ TEST(SyclOps, DeviceMemsetTypedFloat) {
   // SYCL device_memset requires resource context
   camp::resources::Resource sycl_ctx{camp::resources::Sycl{}};
 
-  // Set all elements to 9.99f
   auto event = umpire::device_memset(device_ptr, 9.99f, num_elements, sycl_ctx);
   static_cast<camp::resources::Event>(event).wait();
 
-  // Verify
   void* host_verify = rm.getAllocator("HOST").allocate(num_bytes);
   umpire::copy(static_cast<void*>(device_ptr), host_verify, num_bytes);
 
@@ -427,7 +396,6 @@ TEST(SyclOps, PrefetchSync) {
 
   void* device_ptr = sycl_alloc->allocate(num_bytes);
 
-  // Initialize data
   std::vector<char> host_data(num_bytes, 88);
   void* host_temp = rm.getAllocator("HOST").allocate(num_bytes);
   std::memcpy(host_temp, host_data.data(), num_bytes);
@@ -444,7 +412,6 @@ TEST(SyclOps, PrefetchSync) {
   auto event = umpire::prefetch(device_ptr, 0, num_bytes, sycl_ctx);
   static_cast<camp::resources::Event>(event).wait();
 
-  // Verify data is still intact
   void* host_verify = rm.getAllocator("HOST").allocate(num_bytes);
   umpire::copy(device_ptr, host_verify, num_bytes);
 
@@ -475,7 +442,6 @@ TEST(SyclOps, ZeroSizeCopy) {
   void* src = sycl_alloc->allocate(1024);
   void* dst = sycl_alloc->allocate(1024);
 
-  // Zero-size copy should be a no-op and not crash
   EXPECT_NO_THROW(umpire::copy(src, dst, 0));
 
   sycl_alloc->deallocate(src);
@@ -495,20 +461,16 @@ TEST(SyclOps, ExplicitPlatformAPI) {
   void* src = sycl_alloc->allocate(num_bytes);
   void* dst = sycl_alloc->allocate(num_bytes);
 
-  // Initialize source
   std::vector<char> host_data(num_bytes, 66);
   void* host_temp = rm.getAllocator("HOST").allocate(num_bytes);
   std::memcpy(host_temp, host_data.data(), num_bytes);
   umpire::copy(host_temp, src, num_bytes);
 
-  // Use explicit platform API through camp::resources::Platform
   camp::resources::Resource sycl_ctx{camp::resources::Sycl{}};
 
-  // Copy using explicit resource
   auto event = umpire::copy(src, dst, num_bytes, sycl_ctx);
   static_cast<camp::resources::Event>(event).wait();
 
-  // Verify
   void* host_verify = rm.getAllocator("HOST").allocate(num_bytes);
   umpire::copy(dst, host_verify, num_bytes);
 
@@ -523,6 +485,101 @@ TEST(SyclOps, ExplicitPlatformAPI) {
   sycl_alloc->deallocate(dst);
   rm.getAllocator("HOST").deallocate(host_temp);
   rm.getAllocator("HOST").deallocate(host_verify);
+}
+
+TEST(SyclOps, ExternalUSMCopyWithResource) {
+  sycl::queue queue{sycl::property_list{sycl::property::queue::in_order{}}};
+  if (!queue.get_device().has(sycl::aspect::usm_device_allocations)) {
+    GTEST_SKIP() << "Device does not support USM device allocations";
+  }
+  constexpr std::size_t count = 32;
+  auto free_usm = [&queue](int* ptr) { sycl::free(ptr, queue); };
+  std::unique_ptr<int, decltype(free_usm)> src(sycl::malloc_device<int>(count + 2, queue), free_usm);
+  std::unique_ptr<int, decltype(free_usm)> dst(sycl::malloc_device<int>(count + 2, queue), free_usm);
+  ASSERT_NE(src.get(), nullptr);
+  ASSERT_NE(dst.get(), nullptr);
+  auto& rm = umpire::ResourceManager::getInstance();
+  ASSERT_FALSE(rm.hasAllocator(src.get()));
+  ASSERT_FALSE(rm.hasAllocator(dst.get()));
+  camp::resources::Resource ctx{camp::resources::Sycl::SyclFromQueue(queue)};
+  using camp::resources::Platform;
+  std::vector<int> input(count, 12345);
+  std::vector<int> output(count, 0);
+
+  auto to_device = umpire::copy(Platform::host, Platform::sycl, input.data(), src.get() + 1, count, ctx);
+  static_cast<camp::resources::Event>(to_device).wait();
+  auto to_device2 = umpire::copy(Platform::sycl, Platform::sycl, src.get() + 1, dst.get() + 1, count, ctx);
+  static_cast<camp::resources::Event>(to_device2).wait();
+  auto to_host = umpire::copy(Platform::sycl, Platform::host, dst.get() + 1, output.data(), count, ctx);
+  static_cast<camp::resources::Event>(to_host).wait();
+  EXPECT_EQ(output, input);
+}
+
+TEST(SyclOps, ExternalUSMMemsetWithResource) {
+  sycl::queue queue{sycl::property_list{sycl::property::queue::in_order{}}};
+  if (!queue.get_device().has(sycl::aspect::usm_device_allocations)) {
+    GTEST_SKIP() << "Device does not support USM device allocations";
+  }
+  constexpr std::size_t count = 32;
+  auto free_usm = [&queue](unsigned char* ptr) { sycl::free(ptr, queue); };
+  std::unique_ptr<unsigned char, decltype(free_usm)> ptr(
+      sycl::malloc_device<unsigned char>(count, queue), free_usm);
+  ASSERT_NE(ptr.get(), nullptr);
+  ASSERT_FALSE(umpire::ResourceManager::getInstance().hasAllocator(ptr.get()));
+  camp::resources::Resource ctx{camp::resources::Sycl::SyclFromQueue(queue)};
+  auto event = umpire::memset(camp::resources::Platform::sycl, ptr.get(), 0xAB, count, ctx);
+  static_cast<camp::resources::Event>(event).wait();
+  std::vector<unsigned char> output(count, 0);
+  queue.memcpy(output.data(), ptr.get(), count).wait_and_throw();
+  EXPECT_EQ(output, std::vector<unsigned char>(count, 0xAB));
+}
+
+TEST(SyclOps, ExternalPointersRequireResourceAndMatchingContext) {
+  int external[2] = {1, 2};
+  int output[2] = {};
+  using camp::resources::Platform;
+  EXPECT_THROW(umpire::copy(Platform::sycl, Platform::host, external, output, 2), umpire::resource_error);
+  EXPECT_THROW(umpire::memset(Platform::sycl, external, 0, 2), umpire::resource_error);
+
+  sycl::queue queue{sycl::property_list{sycl::property::queue::in_order{}}};
+  camp::resources::Resource ctx{camp::resources::Sycl::SyclFromQueue(queue)};
+  EXPECT_THROW(umpire::memset(Platform::sycl, external, 0, 2, ctx), umpire::resource_error);
+  if (!queue.get_device().has(sycl::aspect::usm_device_allocations)) {
+    return;
+  }
+  auto free_usm = [&queue](int* ptr) { sycl::free(ptr, queue); };
+  std::unique_ptr<int, decltype(free_usm)> ptr(sycl::malloc_device<int>(2, queue), free_usm);
+  ASSERT_NE(ptr.get(), nullptr);
+  sycl::queue other_queue(sycl::context(queue.get_device()), queue.get_device(),
+                          sycl::property_list{sycl::property::queue::in_order{}});
+  ASSERT_NE(queue.get_context(), other_queue.get_context());
+  camp::resources::Resource other_ctx{camp::resources::Sycl::SyclFromQueue(other_queue)};
+  EXPECT_THROW(umpire::copy(Platform::sycl, Platform::host, ptr.get(), output, 2, other_ctx),
+               umpire::resource_error);
+}
+
+TEST(SyclOps, TrackedAllocationKeepsItsContextWithDifferentResource) {
+  auto& rm = umpire::ResourceManager::getInstance();
+  auto allocator = try_get_allocator(rm, "DEVICE");
+  if (!allocator || allocator->getAllocationStrategy()->getPlatform() != umpire::Platform::sycl) {
+    GTEST_SKIP() << "No SYCL DEVICE allocator available";
+  }
+  constexpr std::size_t count = 32;
+  auto deallocate = [&allocator](unsigned char* ptr) { allocator->deallocate(ptr); };
+  std::unique_ptr<unsigned char, decltype(deallocate)> ptr(
+      static_cast<unsigned char*>(allocator->allocate(count)), deallocate);
+  auto& allocation_queue = umpire::op::detail::get_queue_for_ptr(ptr.get());
+  sycl::queue other_queue(sycl::context(allocation_queue.get_device()), allocation_queue.get_device(),
+                          sycl::property_list{sycl::property::queue::in_order{}});
+  ASSERT_NE(allocation_queue.get_context(), other_queue.get_context());
+  camp::resources::Resource ctx{camp::resources::Sycl::SyclFromQueue(other_queue)};
+  using camp::resources::Platform;
+  auto fill = umpire::memset(Platform::sycl, ptr.get(), 0x55, count, ctx);
+  static_cast<camp::resources::Event>(fill).wait();
+  std::vector<unsigned char> output(count, 0);
+  auto copy = umpire::copy(Platform::sycl, Platform::host, ptr.get(), output.data(), count, ctx);
+  static_cast<camp::resources::Event>(copy).wait();
+  EXPECT_EQ(output, std::vector<unsigned char>(count, 0x55));
 }
 
 #endif // UMPIRE_ENABLE_SYCL

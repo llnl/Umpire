@@ -30,13 +30,14 @@ struct copy<resource::host_platform, resource::host_platform> {
   /**
    * @brief Asynchronous host-to-host memory copy implementation
    *
-   * Since host operations are synchronous, this simply performs a sync copy
-   * and returns a completed event.
+   * Waits for earlier work on the supplied resource before accessing host
+   * memory, then performs a synchronous copy and returns a completed event.
    */
   template <typename T>
   static camp::resources::EventProxy<camp::resources::Resource> exec(T* src, T* dst, std::size_t len,
                                                                      camp::resources::Resource& resource)
   {
+    resource.get_event().wait();
     exec(src, dst, len);
     return detail::make_completed_event(resource);
   }
@@ -61,13 +62,14 @@ struct memset<resource::host_platform> {
   /**
    * @brief Asynchronous memset implementation for host memory
    *
-   * Since host operations are synchronous, this simply performs a sync memset
-   * and returns a completed event.
+   * Waits for earlier work on the supplied resource before accessing host
+   * memory, then performs a synchronous memset and returns a completed event.
    */
   template <typename T>
   static camp::resources::EventProxy<camp::resources::Resource> exec(T* ptr, int val, std::size_t len,
                                                                      camp::resources::Resource& resource)
   {
+    resource.get_event().wait();
     exec(ptr, val, len);
     return detail::make_completed_event(resource);
   }

@@ -27,7 +27,7 @@ void GenericReallocateOperation::transform(void* current_ptr, void** new_ptr,
   const std::size_t old_size = current_allocation->size;
   const std::size_t copy_size = (old_size > new_size) ? new_size : old_size;
 
-  umpire::copy(current_ptr, *new_ptr, copy_size);
+  op::op_caller<op::copy>::exec(current_ptr, *new_ptr, copy_size);
 
   allocator.deallocate(current_ptr);
 }
@@ -42,7 +42,7 @@ camp::resources::EventProxy<camp::resources::Resource> GenericReallocateOperatio
   const std::size_t old_size = current_allocation->size;
   const std::size_t copy_size = (old_size > new_size) ? new_size : old_size;
 
-  auto event = umpire::copy(current_ptr, *new_ptr, copy_size, ctx);
+  auto event = op::op_caller<op::copy>::exec(current_ptr, *new_ptr, copy_size, ctx);
 
   allocator.deallocate(current_ptr);
 

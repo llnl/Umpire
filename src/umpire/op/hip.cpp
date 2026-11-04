@@ -67,7 +67,6 @@ void launch_device_memset(T* ptr, T value, std::size_t count, hipStream_t stream
 
   hipError_t err = hipGetLastError();
 
-  // Synchronize to ensure kernel completion for synchronous operation
   hipError_t sync_err = hipSuccess;
   if (err == hipSuccess && synchronize) {
     sync_err = hipStreamSynchronize(stream);

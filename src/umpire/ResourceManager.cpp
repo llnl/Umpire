@@ -605,7 +605,7 @@ void ResourceManager::copy(void* dst_ptr, void* src_ptr, std::size_t size)
                  fmt::format("Not enough space in destination to copy {} bytes into {} bytes", size, dst_size));
   }
 
-  umpire::copy(static_cast<void*>(src_ptr), static_cast<void*>(dst_ptr), size);
+  op::op_caller<op::copy>::exec(static_cast<void*>(src_ptr), static_cast<void*>(dst_ptr), size);
 #else
   UMPIRE_LOG(Debug, "(src_ptr=" << src_ptr << ", dst_ptr=" << dst_ptr << ", size=" << size << ")");
 
@@ -687,7 +687,7 @@ camp::resources::EventProxy<camp::resources::Resource> ResourceManager::copy(voi
     UMPIRE_ERROR(runtime_error, fmt::format("Not enough resource in destination for copy: {} -> {}", size, dst_size));
   }
 
-  return umpire::copy(static_cast<void*>(src_ptr), static_cast<void*>(dst_ptr), size, ctx);
+  return op::op_caller<op::copy>::exec(static_cast<void*>(src_ptr), static_cast<void*>(dst_ptr), size, ctx);
 #else
   UMPIRE_LOG(Debug, "(src_ptr=" << src_ptr << ", dst_ptr=" << dst_ptr << ", size=" << size << ")");
 
@@ -758,7 +758,7 @@ void ResourceManager::memset(void* ptr, int value, std::size_t length)
     UMPIRE_ERROR(runtime_error, fmt::format("Cannot memset over the end of allocation: {} -> {}", length, size));
   }
 
-  umpire::memset(static_cast<void*>(ptr), value, length);
+  op::op_caller<op::memset>::exec(static_cast<void*>(ptr), value, length);
 #else
   UMPIRE_LOG(Debug, "(ptr=" << ptr << ", value=" << value << ", length=" << length << ")");
 
@@ -825,7 +825,7 @@ camp::resources::EventProxy<camp::resources::Resource> ResourceManager::memset(v
     UMPIRE_ERROR(runtime_error, fmt::format("Cannot memset over the end of allocation: {} -> {}", length, size));
   }
 
-  return umpire::memset(static_cast<void*>(ptr), value, length, ctx);
+  return op::op_caller<op::memset>::exec(static_cast<void*>(ptr), value, length, ctx);
 #else
   UMPIRE_LOG(Debug, "(ptr=" << ptr << ", value=" << value << ", length=" << length << ")");
 
@@ -894,7 +894,7 @@ void* ResourceManager::reallocate(void* current_ptr, std::size_t new_size)
     new_ptr = alloc.allocate(new_size);
   } else {
     UMPIRE_LOG(Debug, "(current_ptr=" << current_ptr << ", new_size=" << new_size << ")");
-    new_ptr = umpire::reallocate(&current_ptr, new_size);
+    new_ptr = op::op_caller<op::reallocate>::exec(&current_ptr, new_size);
   }
 
   umpire::event::record([&](auto& event) {
@@ -973,7 +973,7 @@ void* ResourceManager::reallocate(void* current_ptr, std::size_t new_size, camp:
     new_ptr = alloc.allocate(new_size);
   } else {
     UMPIRE_LOG(Debug, "(current_ptr=" << current_ptr << ", new_size=" << new_size << ")");
-    auto ev = umpire::reallocate(&current_ptr, new_size, ctx);
+    auto ev = op::op_caller<op::reallocate>::exec(&current_ptr, new_size, ctx);
     UMPIRE_USE_VAR(ev);
     new_ptr = current_ptr;
   }
@@ -1026,7 +1026,6 @@ void* ResourceManager::reallocate(void* current_ptr, std::size_t new_size, Alloc
 {
 #if defined(UMPIRE_RM_USE_NEW_OPS)
   if (current_ptr) {
-    // We need to check if the current pointer belongs to the same allocator
     auto src_allocator = getAllocator(current_ptr);
     if (src_allocator.getId() != alloc.getId()) {
       UMPIRE_ERROR(runtime_error, fmt::format("Cannot reallocate {} from allocator \"{}\" with allocator \"{}\"",
@@ -1056,7 +1055,7 @@ void* ResourceManager::reallocate(void* current_ptr, std::size_t new_size, Alloc
   } else {
     UMPIRE_LOG(Debug, "(current_ptr=" << current_ptr << ", new_size=" << new_size << ", with Allocator "
                                       << alloc.getName() << ")");
-    new_ptr = umpire::reallocate(&current_ptr, new_size);
+    new_ptr = op::op_caller<op::reallocate>::exec(&current_ptr, new_size);
   }
 
   umpire::event::record([&](auto& event) {
@@ -1098,7 +1097,6 @@ void* ResourceManager::reallocate(void* current_ptr, std::size_t new_size, Alloc
 {
 #if defined(UMPIRE_RM_USE_NEW_OPS)
   if (current_ptr) {
-    // We need to check if the current pointer belongs to the same allocator
     auto src_allocator = getAllocator(current_ptr);
     if (src_allocator.getId() != alloc.getId()) {
       UMPIRE_ERROR(runtime_error, fmt::format("Cannot reallocate {} from allocator \"{}\" with allocator \"{}\"",
@@ -1129,7 +1127,7 @@ void* ResourceManager::reallocate(void* current_ptr, std::size_t new_size, Alloc
   } else {
     UMPIRE_LOG(Debug, "(current_ptr=" << current_ptr << ", new_size=" << new_size << ", with Allocator "
                                       << alloc.getName() << ")");
-    auto ev = umpire::reallocate(&current_ptr, new_size, ctx);
+    auto ev = op::op_caller<op::reallocate>::exec(&current_ptr, new_size, ctx);
     UMPIRE_USE_VAR(ev);
     new_ptr = current_ptr;
   }
@@ -1325,19 +1323,15 @@ void* ResourceManager::move(void* src_ptr, Allocator allocator)
   }
 #endif
 
-  // Check for offset pointers
   if (src_ptr != alloc_record->ptr) {
     UMPIRE_ERROR(runtime_error, fmt::format("Cannot move an offset ptr (ptr={}, base={})", src_ptr, alloc_record->ptr));
   }
 
-  // Allocate new memory in destination
   std::size_t size = getSize(src_ptr);
   void* dst_ptr = allocator.allocate(size);
 
-  // Copy data
-  umpire::copy(src_ptr, dst_ptr, size);
+  op::op_caller<op::copy>::exec(src_ptr, dst_ptr, size);
 
-  // Deallocate original
   deallocate(src_ptr);
 
   umpire::event::record([&](auto& event) {
@@ -1409,7 +1403,7 @@ void* ResourceManager::move(void* src_ptr, Allocator allocator)
   }
 
   void* dst_ptr{allocator.allocate(alloc_record->size)};
-  umpire::copy(src_ptr, dst_ptr, alloc_record->size);
+  op::op_caller<op::copy>::exec(src_ptr, dst_ptr, alloc_record->size);
 
   deallocate(src_ptr);
 
@@ -1439,7 +1433,6 @@ camp::resources::EventProxy<camp::resources::Resource> ResourceManager::prefetch
     UMPIRE_ERROR(runtime_error, "ResourceManager::prefetch only works on allocations from a UM resource.");
   }
 
-  // Get size from offset to end of allocation
   std::ptrdiff_t offset = static_cast<char*>(ptr) - static_cast<char*>(alloc_record->ptr);
   std::size_t size = alloc_record->size - offset;
 

@@ -21,11 +21,9 @@ TEST(Copy, HostToHost)
   auto& rm = umpire::ResourceManager::getInstance();
   auto allocator = rm.getAllocator("HOST");
 
-  // Allocate source and destination buffers
   int* source_ptr = static_cast<int*>(allocator.allocate(size));
   int* dest_ptr = static_cast<int*>(allocator.allocate(size));
 
-  // Fill source with random data
   std::random_device rd;
   std::mt19937 gen(rd());
   std::uniform_int_distribution<int> distribution(1, 100);
@@ -34,18 +32,14 @@ TEST(Copy, HostToHost)
     source_ptr[i] = distribution(gen);
   }
 
-  // Set destination to zero
   std::memset(dest_ptr, 0, size);
 
-  // Copy data using umpire::copy
   umpire::copy(source_ptr, dest_ptr, num_elements);
 
-  // Verify the copy was successful
   for (int i = 0; i < num_elements; ++i) {
     ASSERT_EQ(source_ptr[i], dest_ptr[i]) << "Data mismatch at index " << i;
   }
 
-  // Cleanup
   allocator.deallocate(source_ptr);
   allocator.deallocate(dest_ptr);
 }
@@ -57,27 +51,21 @@ TEST(Copy, TypedHostToHost)
   auto& rm = umpire::ResourceManager::getInstance();
   auto allocator = rm.getAllocator("HOST");
 
-  // Allocate source and destination buffers
   float* source_ptr = static_cast<float*>(allocator.allocate(num_elements * sizeof(float)));
   float* dest_ptr = static_cast<float*>(allocator.allocate(num_elements * sizeof(float)));
 
-  // Fill source with test data (index as float)
   for (std::size_t i = 0; i < num_elements; ++i) {
     source_ptr[i] = static_cast<float>(i) + 0.5f;
   }
 
-  // Set destination to zero
   std::memset(dest_ptr, 0, num_elements * sizeof(float));
 
-  // Copy data using umpire::copy
   umpire::copy(source_ptr, dest_ptr, num_elements);
 
-  // Verify the copy was successful
   for (std::size_t i = 0; i < num_elements; ++i) {
     ASSERT_FLOAT_EQ(source_ptr[i], dest_ptr[i]) << "Data mismatch at index " << i;
   }
 
-  // Cleanup
   allocator.deallocate(source_ptr);
   allocator.deallocate(dest_ptr);
 }
@@ -92,55 +80,43 @@ TEST(Copy, PartialCopy)
   auto& rm = umpire::ResourceManager::getInstance();
   auto allocator = rm.getAllocator("HOST");
 
-  // Allocate source and destination buffers
   int* source_ptr = static_cast<int*>(allocator.allocate(size));
   int* dest_ptr = static_cast<int*>(allocator.allocate(size));
 
-  // Fill source and destination with known patterns
   for (int i = 0; i < num_elements; ++i) {
-    source_ptr[i] = i + 100; // Source pattern
-    dest_ptr[i] = i;         // Destination pattern
+    source_ptr[i] = i + 100;
+    dest_ptr[i] = i;
   }
 
-  // Copy partial data using umpire::copy
   umpire::copy(source_ptr, dest_ptr, partial_elements);
 
-  // Verify partial copy was successful
   for (int i = 0; i < partial_elements; ++i) {
     ASSERT_EQ(source_ptr[i], dest_ptr[i]) << "Data mismatch at index " << i;
   }
 
-  // Verify the rest of destination is unchanged
   for (int i = partial_elements; i < num_elements; ++i) {
     ASSERT_EQ(dest_ptr[i], i) << "Data unexpectedly changed at index " << i;
   }
 
-  // Cleanup
   allocator.deallocate(source_ptr);
   allocator.deallocate(dest_ptr);
 }
 
-// Test for zero-sized copy
 TEST(Copy, ZeroSize)
 {
   auto& rm = umpire::ResourceManager::getInstance();
   auto allocator = rm.getAllocator("HOST");
 
-  // Allocate source and destination buffers
   void* source_ptr = allocator.allocate(1024);
   void* dest_ptr = allocator.allocate(1024);
 
-  // Fill with known values
   std::memset(source_ptr, 0xAA, 1024);
   std::memset(dest_ptr, 0xBB, 1024);
 
-  // Copy with zero size - should be a no-op
   umpire::copy(source_ptr, dest_ptr, 0);
 
-  // Check first byte to make sure it wasn't changed
   ASSERT_EQ(*static_cast<unsigned char*>(dest_ptr), 0xBB);
 
-  // Cleanup
   allocator.deallocate(source_ptr);
   allocator.deallocate(dest_ptr);
 }
@@ -153,27 +129,22 @@ TEST(Copy, TypedCopySemantics)
   auto& rm = umpire::ResourceManager::getInstance();
   auto allocator = rm.getAllocator("HOST");
 
-  // Allocate buffers for int*
   int* source = static_cast<int*>(allocator.allocate(num_elements * sizeof(int)));
   int* dest = static_cast<int*>(allocator.allocate(num_elements * sizeof(int)));
 
-  // Fill source with known pattern
   for (std::size_t i = 0; i < num_elements; ++i) {
     source[i] = static_cast<int>(i * 7 + 13);
   }
 
-  // Zero out destination
   std::memset(dest, 0, num_elements * sizeof(int));
 
   // Copy using element count (not bytes)
   umpire::copy(source, dest, num_elements);
 
-  // Verify exactly num_elements were copied
   for (std::size_t i = 0; i < num_elements; ++i) {
     ASSERT_EQ(dest[i], static_cast<int>(i * 7 + 13)) << "Element " << i << " not copied correctly";
   }
 
-  // Cleanup
   allocator.deallocate(source);
   allocator.deallocate(dest);
 }
@@ -186,25 +157,20 @@ TEST(Copy, VoidVsTypedSemantics)
   auto& rm = umpire::ResourceManager::getInstance();
   auto allocator = rm.getAllocator("HOST");
 
-  // Allocate as void*
   void* void_src = allocator.allocate(byte_count);
   void* void_dst = allocator.allocate(byte_count);
 
-  // Fill with byte pattern
   std::memset(void_src, 0xAB, byte_count);
   std::memset(void_dst, 0xCD, byte_count);
 
-  // Copy exact byte count
   umpire::copy(void_src, void_dst, byte_count);
 
-  // Verify byte-for-byte copy
   unsigned char* src_bytes = static_cast<unsigned char*>(void_src);
   unsigned char* dst_bytes = static_cast<unsigned char*>(void_dst);
   for (std::size_t i = 0; i < byte_count; ++i) {
     ASSERT_EQ(dst_bytes[i], src_bytes[i]) << "Byte " << i << " not copied correctly";
   }
 
-  // Cleanup
   allocator.deallocate(void_src);
   allocator.deallocate(void_dst);
 }
@@ -218,22 +184,18 @@ TEST(Copy, TypedOutOfBounds)
   auto& rm = umpire::ResourceManager::getInstance();
   auto allocator = rm.getAllocator("HOST");
 
-  // Allocate source and destination buffers of num_elements doubles
   double* source_ptr = static_cast<double*>(allocator.allocate(num_elements * sizeof(double)));
   double* dest_ptr = static_cast<double*>(allocator.allocate(num_elements * sizeof(double)));
 
-  // In-bounds typed copy succeeds
   ASSERT_NO_THROW(umpire::copy(source_ptr, dest_ptr, num_elements));
 
   // One element past the end overruns both buffers by sizeof(double) bytes
   ASSERT_THROW(umpire::copy(source_ptr, dest_ptr, num_elements + 1), umpire::runtime_error);
 
-  // Cleanup
   allocator.deallocate(source_ptr);
   allocator.deallocate(dest_ptr);
 }
 
-// Test that typed copy into a smaller destination is caught
 TEST(Copy, TypedOutOfBoundsSmallerDestination)
 {
   constexpr std::size_t src_elements = 16;
@@ -246,14 +208,12 @@ TEST(Copy, TypedOutOfBoundsSmallerDestination)
   double* source_ptr = static_cast<double*>(allocator.allocate(src_elements * sizeof(double)));
   double* dest_ptr = static_cast<double*>(allocator.allocate(dst_elements * sizeof(double)));
 
-  // Copy that fits the destination succeeds
   ASSERT_NO_THROW(umpire::copy(source_ptr, dest_ptr, dst_elements));
 
   // Copy that fits the source but not the destination throws
   ASSERT_THROW(umpire::copy(source_ptr, dest_ptr, dst_elements + 1), umpire::runtime_error);
   ASSERT_THROW(umpire::copy(source_ptr, dest_ptr, src_elements), umpire::runtime_error);
 
-  // Cleanup
   allocator.deallocate(source_ptr);
   allocator.deallocate(dest_ptr);
 }
@@ -267,33 +227,25 @@ TEST(Copy, HostToHostAsync)
   auto& rm = umpire::ResourceManager::getInstance();
   auto allocator = rm.getAllocator("HOST");
 
-  // Allocate source and destination buffers
   int* source_ptr = static_cast<int*>(allocator.allocate(size));
   int* dest_ptr = static_cast<int*>(allocator.allocate(size));
 
-  // Fill source with test data
   for (int i = 0; i < num_elements; ++i) {
     source_ptr[i] = i + 500;
   }
 
-  // Set destination to zero
   std::memset(dest_ptr, 0, size);
 
-  // Create host resource for async operation
   camp::resources::Resource host_ctx{camp::resources::Host{}};
 
-  // Copy data using async variant
   auto event = umpire::copy(source_ptr, dest_ptr, num_elements, host_ctx);
 
-  // Wait for async operation to complete
   static_cast<camp::resources::Event>(event).wait();
 
-  // Verify the copy was successful
   for (int i = 0; i < num_elements; ++i) {
     ASSERT_EQ(source_ptr[i], dest_ptr[i]) << "Async copy failed at index " << i;
   }
 
-  // Cleanup
   allocator.deallocate(source_ptr);
   allocator.deallocate(dest_ptr);
 }
@@ -308,37 +260,28 @@ TEST(Copy, CudaToHostAsync)
   auto cuda_allocator = rm.getAllocator("DEVICE");
   auto host_allocator = rm.getAllocator("HOST");
 
-  // Allocate device and host buffers
   int* device_ptr = static_cast<int*>(cuda_allocator.allocate(size));
   int* host_ptr = static_cast<int*>(host_allocator.allocate(size));
   int* temp_host = static_cast<int*>(host_allocator.allocate(size));
 
-  // Fill temp host buffer with test data
   for (int i = 0; i < num_elements; ++i) {
     temp_host[i] = i + 600;
   }
 
-  // Copy data to device synchronously
   umpire::copy(temp_host, device_ptr, num_elements);
 
-  // Zero out destination
   std::memset(host_ptr, 0, size);
 
-  // Create CUDA resource for async operation
   camp::resources::Resource cuda_ctx{camp::resources::Cuda{}};
 
-  // Async copy from device to host
   auto event = umpire::copy(device_ptr, host_ptr, num_elements, cuda_ctx);
 
-  // Wait for async operation to complete
   static_cast<camp::resources::Event>(event).wait();
 
-  // Verify the copy was successful
   for (int i = 0; i < num_elements; ++i) {
     ASSERT_EQ(host_ptr[i], i + 600) << "Async CUDA->Host copy failed at index " << i;
   }
 
-  // Cleanup
   cuda_allocator.deallocate(device_ptr);
   host_allocator.deallocate(host_ptr);
   host_allocator.deallocate(temp_host);
@@ -353,34 +296,26 @@ TEST(Copy, HostToCudaAsync)
   auto cuda_allocator = rm.getAllocator("DEVICE");
   auto host_allocator = rm.getAllocator("HOST");
 
-  // Allocate device and host buffers
   int* device_ptr = static_cast<int*>(cuda_allocator.allocate(size));
   int* host_src = static_cast<int*>(host_allocator.allocate(size));
   int* host_verify = static_cast<int*>(host_allocator.allocate(size));
 
-  // Fill source with test data
   for (int i = 0; i < num_elements; ++i) {
     host_src[i] = i + 700;
   }
 
-  // Create CUDA resource for async operation
   camp::resources::Resource cuda_ctx{camp::resources::Cuda{}};
 
-  // Async copy from host to device
   auto event = umpire::copy(host_src, device_ptr, num_elements, cuda_ctx);
 
-  // Wait for async operation to complete
   static_cast<camp::resources::Event>(event).wait();
 
-  // Copy back to verify
   umpire::copy(device_ptr, host_verify, num_elements);
 
-  // Verify the copy was successful
   for (int i = 0; i < num_elements; ++i) {
     ASSERT_EQ(host_verify[i], i + 700) << "Async Host->CUDA copy failed at index " << i;
   }
 
-  // Cleanup
   cuda_allocator.deallocate(device_ptr);
   host_allocator.deallocate(host_src);
   host_allocator.deallocate(host_verify);
@@ -401,18 +336,14 @@ TEST(Copy, ExplicitPlatformHostToHost)
   int* source_ptr = static_cast<int*>(allocator.allocate(num_elements * sizeof(int)));
   int* dest_ptr = static_cast<int*>(allocator.allocate(num_elements * sizeof(int)));
 
-  // Initialize source data
   for (std::size_t i = 0; i < num_elements; ++i) {
     source_ptr[i] = static_cast<int>(i * 3 + 42);
   }
 
-  // Zero destination
   std::memset(dest_ptr, 0, num_elements * sizeof(int));
 
-  // Copy using explicit platform parameters
   umpire::copy(camp::resources::Platform::host, camp::resources::Platform::host, source_ptr, dest_ptr, num_elements);
 
-  // Verify
   for (std::size_t i = 0; i < num_elements; ++i) {
     ASSERT_EQ(source_ptr[i], dest_ptr[i]) << "Data mismatch at index " << i;
   }
@@ -431,25 +362,19 @@ TEST(Copy, ExplicitPlatformHostToHostAsync)
   int* source_ptr = static_cast<int*>(allocator.allocate(num_elements * sizeof(int)));
   int* dest_ptr = static_cast<int*>(allocator.allocate(num_elements * sizeof(int)));
 
-  // Initialize source data
   for (std::size_t i = 0; i < num_elements; ++i) {
     source_ptr[i] = static_cast<int>(i * 5 + 17);
   }
 
-  // Zero destination
   std::memset(dest_ptr, 0, num_elements * sizeof(int));
 
-  // Create host resource
   camp::resources::Resource host_ctx{camp::resources::Host{}};
 
-  // Async copy using explicit platform parameters
   auto event = umpire::copy(camp::resources::Platform::host, camp::resources::Platform::host, source_ptr, dest_ptr,
                             num_elements, host_ctx);
 
-  // Wait for completion
   static_cast<camp::resources::Event>(event).wait();
 
-  // Verify
   for (std::size_t i = 0; i < num_elements; ++i) {
     ASSERT_EQ(source_ptr[i], dest_ptr[i]) << "Data mismatch at index " << i;
   }
@@ -471,21 +396,16 @@ TEST(Copy, ExplicitPlatformCudaToHost)
   int* host_src = static_cast<int*>(host_allocator.allocate(num_elements * sizeof(int)));
   int* host_dst = static_cast<int*>(host_allocator.allocate(num_elements * sizeof(int)));
 
-  // Initialize host source
   for (std::size_t i = 0; i < num_elements; ++i) {
     host_src[i] = static_cast<int>(i * 7 + 99);
   }
 
-  // Copy to device first
   umpire::copy(host_src, device_ptr, num_elements);
 
-  // Zero destination
   std::memset(host_dst, 0, num_elements * sizeof(int));
 
-  // Copy from device to host using explicit platforms
   umpire::copy(camp::resources::Platform::cuda, camp::resources::Platform::host, device_ptr, host_dst, num_elements);
 
-  // Verify
   for (std::size_t i = 0; i < num_elements; ++i) {
     ASSERT_EQ(host_dst[i], static_cast<int>(i * 7 + 99)) << "Data mismatch at index " << i;
   }
@@ -507,18 +427,14 @@ TEST(Copy, ExplicitPlatformHostToCuda)
   int* host_src = static_cast<int*>(host_allocator.allocate(num_elements * sizeof(int)));
   int* host_verify = static_cast<int*>(host_allocator.allocate(num_elements * sizeof(int)));
 
-  // Initialize host source
   for (std::size_t i = 0; i < num_elements; ++i) {
     host_src[i] = static_cast<int>(i * 11 + 13);
   }
 
-  // Copy from host to device using explicit platforms
   umpire::copy(camp::resources::Platform::host, camp::resources::Platform::cuda, host_src, device_ptr, num_elements);
 
-  // Copy back to verify
   umpire::copy(device_ptr, host_verify, num_elements);
 
-  // Verify
   for (std::size_t i = 0; i < num_elements; ++i) {
     ASSERT_EQ(host_verify[i], static_cast<int>(i * 11 + 13)) << "Data mismatch at index " << i;
   }
@@ -540,26 +456,20 @@ TEST(Copy, ExplicitPlatformCudaToHostAsync)
   int* host_src = static_cast<int*>(host_allocator.allocate(num_elements * sizeof(int)));
   int* host_dst = static_cast<int*>(host_allocator.allocate(num_elements * sizeof(int)));
 
-  // Initialize and copy to device
   for (std::size_t i = 0; i < num_elements; ++i) {
     host_src[i] = static_cast<int>(i * 13 + 79);
   }
   umpire::copy(host_src, device_ptr, num_elements);
 
-  // Zero destination
   std::memset(host_dst, 0, num_elements * sizeof(int));
 
-  // Create CUDA resource
   camp::resources::Resource cuda_ctx{camp::resources::Cuda{}};
 
-  // Async copy using explicit platforms
   auto event = umpire::copy(camp::resources::Platform::cuda, camp::resources::Platform::host, device_ptr, host_dst,
                             num_elements, cuda_ctx);
 
-  // Wait for completion
   static_cast<camp::resources::Event>(event).wait();
 
-  // Verify
   for (std::size_t i = 0; i < num_elements; ++i) {
     ASSERT_EQ(host_dst[i], static_cast<int>(i * 13 + 79)) << "Data mismatch at index " << i;
   }

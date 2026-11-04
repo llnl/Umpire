@@ -10,13 +10,13 @@
 #include "umpire/op.hpp"
 
 #include <optional>
+#include <memory>
 #include <vector>
 
 #if defined(UMPIRE_ENABLE_OPENMP_TARGET)
 
 namespace {
 
-// Helper to safely get allocator without throwing if unavailable
 std::optional<umpire::Allocator> try_get_allocator(umpire::ResourceManager& rm, const char* name) {
   try {
     return rm.getAllocator(name);
@@ -46,18 +46,14 @@ TEST(OpenMPTargetOps, DeviceToDeviceCopySync) {
   void* src = omp_alloc->allocate(num_bytes);
   void* dst = omp_alloc->allocate(num_bytes);
 
-  // Initialize source data on host
   std::vector<char> host_data(num_bytes, 42);
   void* host_buf = rm.getAllocator("HOST").allocate(num_bytes);
   std::memcpy(host_buf, host_data.data(), num_bytes);
 
-  // Copy to device source
   umpire::copy(host_buf, src, num_bytes);
 
-  // Device-to-device copy (synchronous)
   umpire::copy(src, dst, num_bytes);
 
-  // Verify by copying back to host
   std::vector<char> result(num_bytes, 0);
   void* verify_buf = rm.getAllocator("HOST").allocate(num_bytes);
   umpire::copy(dst, verify_buf, num_bytes);
@@ -90,22 +86,17 @@ TEST(OpenMPTargetOps, DeviceToDeviceCopyAsync) {
   void* src = omp_alloc->allocate(num_bytes);
   void* dst = omp_alloc->allocate(num_bytes);
 
-  // Initialize source
   std::vector<char> host_data(num_bytes, 99);
   void* host_buf = rm.getAllocator("HOST").allocate(num_bytes);
   std::memcpy(host_buf, host_data.data(), num_bytes);
   umpire::copy(host_buf, src, num_bytes);
 
-  // Create OpenMP resource context
   camp::resources::Resource omp_ctx{camp::resources::Omp{}};
 
-  // Async API call (actually executes synchronously)
   auto event = umpire::copy(src, dst, num_bytes, omp_ctx);
 
-  // Wait for "completion" (returns immediately since operation is sync)
   static_cast<camp::resources::Event>(event).wait();
 
-  // Verify
   void* verify_buf = rm.getAllocator("HOST").allocate(num_bytes);
   umpire::copy(dst, verify_buf, num_bytes);
 
@@ -135,14 +126,11 @@ TEST(OpenMPTargetOps, HostToDeviceCopySync) {
   void* host_src = rm.getAllocator("HOST").allocate(num_bytes);
   void* device_dst = omp_alloc->allocate(num_bytes);
 
-  // Initialize host data
   std::vector<char> host_data(num_bytes, 77);
   std::memcpy(host_src, host_data.data(), num_bytes);
 
-  // Host-to-device copy (synchronous)
   umpire::copy(host_src, device_dst, num_bytes);
 
-  // Verify by copying back
   void* host_verify = rm.getAllocator("HOST").allocate(num_bytes);
   umpire::copy(device_dst, host_verify, num_bytes);
 
@@ -174,18 +162,14 @@ TEST(OpenMPTargetOps, HostToDeviceCopyAsync) {
   void* host_src = rm.getAllocator("HOST").allocate(num_bytes);
   void* device_dst = omp_alloc->allocate(num_bytes);
 
-  // Initialize host data
   std::vector<int> host_data(num_bytes / sizeof(int), 12345);
   std::memcpy(host_src, host_data.data(), num_bytes);
 
-  // Create OpenMP resource context
   camp::resources::Resource omp_ctx{camp::resources::Omp{}};
 
-  // Async API call (actually synchronous)
   auto event = umpire::copy(host_src, device_dst, num_bytes, omp_ctx);
   static_cast<camp::resources::Event>(event).wait();
 
-  // Verify
   void* host_verify = rm.getAllocator("HOST").allocate(num_bytes);
   umpire::copy(device_dst, host_verify, num_bytes);
 
@@ -215,16 +199,13 @@ TEST(OpenMPTargetOps, DeviceToHostCopySync) {
   void* device_src = omp_alloc->allocate(num_bytes);
   void* host_dst = rm.getAllocator("HOST").allocate(num_bytes);
 
-  // Initialize device data via host
   std::vector<double> host_data(num_elements, 3.14159);
   void* host_temp = rm.getAllocator("HOST").allocate(num_bytes);
   std::memcpy(host_temp, host_data.data(), num_bytes);
   umpire::copy(host_temp, device_src, num_bytes);
 
-  // Device-to-host copy (synchronous)
   umpire::copy(device_src, host_dst, num_bytes);
 
-  // Verify
   std::vector<double> result(num_elements, 0.0);
   std::memcpy(result.data(), host_dst, num_bytes);
 
@@ -254,20 +235,16 @@ TEST(OpenMPTargetOps, DeviceToHostCopyAsync) {
   void* device_src = omp_alloc->allocate(num_bytes);
   void* host_dst = rm.getAllocator("HOST").allocate(num_bytes);
 
-  // Initialize device data
   std::vector<float> host_data(num_elements, 2.71828f);
   void* host_temp = rm.getAllocator("HOST").allocate(num_bytes);
   std::memcpy(host_temp, host_data.data(), num_bytes);
   umpire::copy(host_temp, device_src, num_bytes);
 
-  // Create OpenMP resource context
   camp::resources::Resource omp_ctx{camp::resources::Omp{}};
 
-  // Async API call (actually synchronous)
   auto event = umpire::copy(device_src, host_dst, num_bytes, omp_ctx);
   static_cast<camp::resources::Event>(event).wait();
 
-  // Verify
   std::vector<float> result(num_elements, 0.0f);
   std::memcpy(result.data(), host_dst, num_bytes);
 
@@ -296,10 +273,8 @@ TEST(OpenMPTargetOps, MemsetSync) {
 
   void* device_ptr = omp_alloc->allocate(num_bytes);
 
-  // Memset (synchronous)
   umpire::memset(device_ptr, 0xAB, num_bytes);
 
-  // Verify by copying to host
   void* host_verify = rm.getAllocator("HOST").allocate(num_bytes);
   umpire::copy(device_ptr, host_verify, num_bytes);
 
@@ -329,14 +304,11 @@ TEST(OpenMPTargetOps, MemsetAsync) {
 
   void* device_ptr = omp_alloc->allocate(num_bytes);
 
-  // Create OpenMP resource context
   camp::resources::Resource omp_ctx{camp::resources::Omp{}};
 
-  // Async API call (actually synchronous)
   auto event = umpire::memset(device_ptr, 0x55, num_bytes, omp_ctx);
   static_cast<camp::resources::Event>(event).wait();
 
-  // Verify
   void* host_verify = rm.getAllocator("HOST").allocate(num_bytes);
   umpire::copy(device_ptr, host_verify, num_bytes);
 
@@ -372,7 +344,6 @@ TEST(OpenMPTargetOps, DeviceMemsetTypedInt) {
   // (unlike SYCL which requires it)
   umpire::device_memset(device_ptr, 42, num_elements);
 
-  // Verify by copying to host
   void* host_verify = rm.getAllocator("HOST").allocate(num_bytes);
   umpire::copy(static_cast<void*>(device_ptr), host_verify, num_bytes);
 
@@ -402,7 +373,6 @@ TEST(OpenMPTargetOps, ZeroSizeCopy) {
   void* src = omp_alloc->allocate(1024);
   void* dst = omp_alloc->allocate(1024);
 
-  // Zero-size copy should be a no-op and not crash
   EXPECT_NO_THROW(umpire::copy(src, dst, 0));
 
   omp_alloc->deallocate(src);
@@ -435,16 +405,13 @@ TEST(OpenMPTargetOps, AsyncIsSynchronousDocumented) {
   void* src = omp_alloc->allocate(num_bytes);
   void* dst = omp_alloc->allocate(num_bytes);
 
-  // Initialize data
   std::vector<char> host_data(num_bytes, 123);
   void* host_buf = rm.getAllocator("HOST").allocate(num_bytes);
   std::memcpy(host_buf, host_data.data(), num_bytes);
   umpire::copy(host_buf, src, num_bytes);
 
-  // Create OpenMP resource for "async" operation
   camp::resources::Resource omp_ctx{camp::resources::Omp{}};
 
-  // Call async API (executes synchronously)
   auto event = umpire::copy(src, dst, num_bytes, omp_ctx);
 
   // At this point, the copy is already complete (synchronous execution)
@@ -452,7 +419,6 @@ TEST(OpenMPTargetOps, AsyncIsSynchronousDocumented) {
 
   static_cast<camp::resources::Event>(event).wait();
 
-  // Verify data was copied
   void* host_verify = rm.getAllocator("HOST").allocate(num_bytes);
   umpire::copy(dst, host_verify, num_bytes);
 
@@ -467,6 +433,82 @@ TEST(OpenMPTargetOps, AsyncIsSynchronousDocumented) {
   omp_alloc->deallocate(dst);
   rm.getAllocator("HOST").deallocate(host_buf);
   rm.getAllocator("HOST").deallocate(host_verify);
+}
+
+TEST(OpenMPTargetOps, ExternalTargetCopyWithResource) {
+  const int device = omp_get_num_devices() > 0 ? 0 : omp_get_initial_device();
+  constexpr std::size_t count = 32;
+  auto free_target = [device](int* ptr) { omp_target_free(ptr, device); };
+  std::unique_ptr<int, decltype(free_target)> src(
+      static_cast<int*>(omp_target_alloc((count + 2) * sizeof(int), device)), free_target);
+  std::unique_ptr<int, decltype(free_target)> dst(
+      static_cast<int*>(omp_target_alloc((count + 2) * sizeof(int), device)), free_target);
+  ASSERT_NE(src.get(), nullptr);
+  ASSERT_NE(dst.get(), nullptr);
+  auto& rm = umpire::ResourceManager::getInstance();
+  ASSERT_FALSE(rm.hasAllocator(src.get()));
+  ASSERT_FALSE(rm.hasAllocator(dst.get()));
+  camp::resources::Resource ctx{camp::resources::Omp(-1, device)};
+  using camp::resources::Platform;
+  std::vector<int> input(count, 12345);
+  std::vector<int> output(count, 0);
+
+  auto to_device = umpire::copy(Platform::host, Platform::omp_target, input.data(), src.get() + 1, count, ctx);
+  static_cast<camp::resources::Event>(to_device).wait();
+  auto to_device2 = umpire::copy(Platform::omp_target, Platform::omp_target,
+                                src.get() + 1, dst.get() + 1, count, ctx);
+  static_cast<camp::resources::Event>(to_device2).wait();
+  auto to_host = umpire::copy(Platform::omp_target, Platform::host, dst.get() + 1, output.data(), count, ctx);
+  static_cast<camp::resources::Event>(to_host).wait();
+  EXPECT_EQ(output, input);
+}
+
+TEST(OpenMPTargetOps, ExternalTargetMemsetWithResource) {
+  const int device = omp_get_num_devices() > 0 ? 0 : omp_get_initial_device();
+  constexpr std::size_t count = 32;
+  auto free_target = [device](unsigned char* ptr) { omp_target_free(ptr, device); };
+  std::unique_ptr<unsigned char, decltype(free_target)> ptr(
+      static_cast<unsigned char*>(omp_target_alloc(count, device)), free_target);
+  ASSERT_NE(ptr.get(), nullptr);
+  ASSERT_FALSE(umpire::ResourceManager::getInstance().hasAllocator(ptr.get()));
+  camp::resources::Resource ctx{camp::resources::Omp(-1, device)};
+  auto event = umpire::memset(camp::resources::Platform::omp_target, ptr.get(), 0xAB, count, ctx);
+  static_cast<camp::resources::Event>(event).wait();
+  std::vector<unsigned char> output(count, 0);
+  ASSERT_EQ(omp_target_memcpy(output.data(), ptr.get(), count, 0, 0, omp_get_initial_device(), device), 0);
+  EXPECT_EQ(output, std::vector<unsigned char>(count, 0xAB));
+}
+
+TEST(OpenMPTargetOps, ExternalPointersRequireResource) {
+  int external[2] = {1, 2};
+  int output[2] = {};
+  using camp::resources::Platform;
+  EXPECT_THROW(umpire::copy(Platform::omp_target, Platform::host, external, output, 2),
+               umpire::resource_error);
+  EXPECT_THROW(umpire::memset(Platform::omp_target, external, 0, 2), umpire::resource_error);
+  EXPECT_THROW(umpire::device_memset(Platform::omp_target, external, 0, 2), umpire::resource_error);
+}
+
+TEST(OpenMPTargetOps, TrackedDeviceOverridesResource) {
+  auto& rm = umpire::ResourceManager::getInstance();
+  auto allocator = try_get_allocator(rm, "DEVICE");
+  if (!allocator || allocator->getAllocationStrategy()->getPlatform() != umpire::Platform::omp_target) {
+    GTEST_SKIP() << "No OpenMP target DEVICE allocator available";
+  }
+  constexpr std::size_t count = 32;
+  auto deallocate = [&allocator](unsigned char* ptr) { allocator->deallocate(ptr); };
+  std::unique_ptr<unsigned char, decltype(deallocate)> ptr(
+      static_cast<unsigned char*>(allocator->allocate(count)), deallocate);
+  camp::resources::Resource ctx{camp::resources::Omp(-1, omp_get_initial_device())};
+  EXPECT_EQ(umpire::op::detail::get_device_id(ptr.get(), &ctx),
+            allocator->getAllocationStrategy()->getTraits().id);
+  using camp::resources::Platform;
+  auto fill = umpire::memset(Platform::omp_target, ptr.get(), 0x55, count, ctx);
+  static_cast<camp::resources::Event>(fill).wait();
+  std::vector<unsigned char> output(count, 0);
+  auto copy = umpire::copy(Platform::omp_target, Platform::host, ptr.get(), output.data(), count, ctx);
+  static_cast<camp::resources::Event>(copy).wait();
+  EXPECT_EQ(output, std::vector<unsigned char>(count, 0x55));
 }
 
 #endif // UMPIRE_ENABLE_OPENMP_TARGET

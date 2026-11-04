@@ -66,7 +66,6 @@ void launch_device_memset(T* ptr, T value, std::size_t count, cudaStream_t strea
 
   cudaError_t err = cudaGetLastError();
 
-  // Synchronize to ensure kernel completion for synchronous operation
   cudaError_t sync_err = cudaSuccess;
   if (err == cudaSuccess && synchronize) {
     sync_err = cudaStreamSynchronize(stream);

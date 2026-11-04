@@ -6,9 +6,11 @@
 ##############################################################################
 set(test_sources
   copy_test.cpp
+  host_ordering_test.cpp
   memset_test.cpp
   device_memset_test.cpp
   reallocate_test.cpp
+  reallocate_platform_test.cpp
   prefetch_test.cpp
   advise_test.cpp
   sycl_ops_test.cpp

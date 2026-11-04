@@ -45,6 +45,10 @@ namespace detail {
 inline int get_device_id(const void* ptr)
 {
   auto& rm = ResourceManager::getInstance();
+  if (!rm.hasAllocator(const_cast<void*>(ptr))) {
+    UMPIRE_ERROR(resource_error,
+                 "OpenMP target operations on external device memory require an OpenMP resource context");
+  }
   auto* record = rm.findAllocationRecord(const_cast<void*>(ptr));
   return record->strategy->getTraits().id;
 }
@@ -69,6 +73,16 @@ inline int get_device(camp::resources::Resource& resource)
   return omp_resource->get_device();
 }
 
+// A tracked allocation's device remains authoritative, including for copies
+// between devices. The resource supplies the device for each external pointer.
+inline int get_device_id(const void* ptr, camp::resources::Resource* resource)
+{
+  if (resource && !ResourceManager::getInstance().hasAllocator(const_cast<void*>(ptr))) {
+    return get_device(*resource);
+  }
+  return get_device_id(ptr);
+}
+
 } // namespace detail
 
 // OpenMP Target implementation helpers
@@ -85,8 +99,7 @@ namespace omp_target_impl {
 // "OpenMP Target Async Limitations" note), so they are not enqueued on `res`.
 // Validate that `res` is actually an Omp resource (fail fast on mismatched
 // resource types, matching the get_stream()/get_queue() pattern used by other
-// backends), then wait on its pending work so the op is ordered after it,
-// matching the old MemoryOperation::transform_async/apply_async pattern.
+// backends), then wait on its pending work so the op is ordered after it.
 inline void wait_for_resource(camp::resources::Resource& res)
 {
   detail::get_device(res);
@@ -95,16 +108,18 @@ inline void wait_for_resource(camp::resources::Resource& res)
 
 // Helper function for device-to-device copy operations
 //
-// Both pointers live on OpenMP target devices, so the device id for each
-// side is looked up independently via the Umpire allocation map (mirrors
-// OpenMPTargetCopyOperation::transform, which used
-// src_allocation->strategy->getTraits().id / dst_allocation->strategy->getTraits().id).
+// Resolve each device independently from allocation metadata, using the
+// supplied resource's device for external pointers.
 template <typename T>
-inline void copy_impl(T* src_ptr, T* dst_ptr, std::size_t count) {
+inline void copy_impl(T* src_ptr, T* dst_ptr, std::size_t count,
+                      camp::resources::Resource* res = nullptr) {
   std::size_t size = detail::get_size<T>(count);
+  if (size == 0) {
+    return;
+  }
 
-  int src_device = detail::get_device_id(src_ptr);
-  int dst_device = detail::get_device_id(dst_ptr);
+  int src_device = detail::get_device_id(src_ptr, res);
+  int dst_device = detail::get_device_id(dst_ptr, res);
 
   UMPIRE_LOG(Debug, "omp_target_memcpy(dst_ptr = "
                         << static_cast<void*>(dst_ptr) << ", src_ptr = " << static_cast<void*>(src_ptr)
@@ -116,16 +131,18 @@ inline void copy_impl(T* src_ptr, T* dst_ptr, std::size_t count) {
 
 // Helper function for host-to-device copy operations
 //
-// The host side always targets omp_get_initial_device() (mirrors the legacy
-// OpenMPTargetCopyOperation, where host allocations carry
-// getTraits().id == omp_get_initial_device()); the device side's id is
-// looked up via the Umpire allocation map.
+// The host side always targets omp_get_initial_device(); the device side uses
+// allocation metadata or the supplied resource's device for external pointers.
 template <typename T>
-inline void host_to_device_copy_impl(T* src_ptr, T* dst_ptr, std::size_t count) {
+inline void host_to_device_copy_impl(T* src_ptr, T* dst_ptr, std::size_t count,
+                                     camp::resources::Resource* res = nullptr) {
   std::size_t size = detail::get_size<T>(count);
+  if (size == 0) {
+    return;
+  }
 
   int src_device = omp_get_initial_device();
-  int dst_device = detail::get_device_id(dst_ptr);
+  int dst_device = detail::get_device_id(dst_ptr, res);
 
   UMPIRE_LOG(Debug, "omp_target_memcpy(dst_ptr = "
                         << static_cast<void*>(dst_ptr) << ", src_ptr = " << static_cast<const void*>(src_ptr)
@@ -137,14 +154,18 @@ inline void host_to_device_copy_impl(T* src_ptr, T* dst_ptr, std::size_t count) 
 
 // Helper function for device-to-host copy operations
 //
-// Mirror of host_to_device_copy_impl: the device side's id comes from the
-// Umpire allocation map, the host side always targets
+// Mirror of host_to_device_copy_impl: resolve the device side independently,
+// while the host side always targets
 // omp_get_initial_device().
 template <typename T>
-inline void device_to_host_copy_impl(T* src_ptr, T* dst_ptr, std::size_t count) {
+inline void device_to_host_copy_impl(T* src_ptr, T* dst_ptr, std::size_t count,
+                                     camp::resources::Resource* res = nullptr) {
   std::size_t size = detail::get_size<T>(count);
+  if (size == 0) {
+    return;
+  }
 
-  int src_device = detail::get_device_id(src_ptr);
+  int src_device = detail::get_device_id(src_ptr, res);
   int dst_device = omp_get_initial_device();
 
   UMPIRE_LOG(Debug, "omp_target_memcpy(dst_ptr = "
@@ -167,8 +188,8 @@ inline void device_to_host_copy_impl(T* src_ptr, T* dst_ptr, std::size_t count) 
 //   - No actual overlap with host computation
 //   - The camp::resources::Resource is validated and its pending work is
 //     waited on before the operation runs (via wait_for_resource()); the
-//     device(s) targeted are always derived from the pointers' Umpire
-//     allocation records, matching the synchronous operations
+//     tracked device pointers use their allocation records, while external
+//     device pointers use the resource's device
 //
 // This means:
 //   - Performance: Same as synchronous operations
@@ -184,7 +205,7 @@ inline camp::resources::EventProxy<camp::resources::Resource> copy_async_impl(
   // The src/dst devices for the copy are derived per-pointer, since a copy
   // may span two different devices.
   wait_for_resource(res);
-  copy_impl(src_ptr, dst_ptr, count);
+  copy_impl(src_ptr, dst_ptr, count, &res);
   return camp::resources::EventProxy<camp::resources::Resource>{res};
 }
 
@@ -192,9 +213,8 @@ inline camp::resources::EventProxy<camp::resources::Resource> copy_async_impl(
 template <typename T>
 inline camp::resources::EventProxy<camp::resources::Resource> host_to_device_async_impl(
     T* src_ptr, T* dst_ptr, std::size_t count, camp::resources::Resource& res) {
-  // See copy_async_impl: devices derived per-pointer.
   wait_for_resource(res);
-  host_to_device_copy_impl(src_ptr, dst_ptr, count);
+  host_to_device_copy_impl(src_ptr, dst_ptr, count, &res);
   return camp::resources::EventProxy<camp::resources::Resource>{res};
 }
 
@@ -202,23 +222,23 @@ inline camp::resources::EventProxy<camp::resources::Resource> host_to_device_asy
 template <typename T>
 inline camp::resources::EventProxy<camp::resources::Resource> device_to_host_async_impl(
     T* src_ptr, T* dst_ptr, std::size_t count, camp::resources::Resource& res) {
-  // See copy_async_impl: devices derived per-pointer.
   wait_for_resource(res);
-  device_to_host_copy_impl(src_ptr, dst_ptr, count);
+  device_to_host_copy_impl(src_ptr, dst_ptr, count, &res);
   return camp::resources::EventProxy<camp::resources::Resource>{res};
 }
 
 // Helper function for memset operations
 //
-// Mirrors OpenMPTargetMemsetOperation::apply's
-// `#pragma omp target is_device_ptr(data_ptr) device(device)` +
-// teams distribute parallel for pattern, with the device id derived from the
-// pointer's Umpire allocation record.
+// Use the allocation's device, or the resource's device for external memory.
 template <typename T>
-inline void memset_impl(T* ptr, int val, std::size_t count) {
+inline void memset_impl(T* ptr, int val, std::size_t count,
+                        camp::resources::Resource* res = nullptr) {
   std::size_t size = detail::get_size<T>(count);
+  if (size == 0) {
+    return;
+  }
 
-  int device = detail::get_device_id(ptr);
+  int device = detail::get_device_id(ptr, res);
   unsigned char* data_ptr = reinterpret_cast<unsigned char*>(ptr);
 
 #pragma omp target is_device_ptr(data_ptr) device(device)
@@ -230,14 +250,13 @@ inline void memset_impl(T* ptr, int val, std::size_t count) {
 
 // Helper function for memset operations that returns an Event
 //
-// Like memset_impl, the device is derived from the pointer's allocation
-// record (the memory lives on that device regardless of `res`'s device),
-// mirroring OpenMPTargetMemsetOperation.
+// Like memset_impl, tracked pointers retain the allocation's device regardless
+// of res's device; external pointers use res's device.
 template <typename T>
 inline camp::resources::EventProxy<camp::resources::Resource> memset_async_impl(
     T* ptr, int val, std::size_t count, camp::resources::Resource& res) {
   wait_for_resource(res);
-  memset_impl(ptr, val, count);
+  memset_impl(ptr, val, count, &res);
 
   return camp::resources::EventProxy<camp::resources::Resource>{res};
 }
@@ -245,14 +264,15 @@ inline camp::resources::EventProxy<camp::resources::Resource> memset_async_impl(
 // Helper function for typed (element-wise) device_memset
 //
 // The device id is derived from the pointer's Umpire allocation record, as
-// in memset_impl (mirrors OpenMPTargetMemsetOperation's device(...) clause).
+// in memset_impl.
 template <typename T>
-inline void device_memset_impl(T* ptr, T value, std::size_t len) {
+inline void device_memset_impl(T* ptr, T value, std::size_t len,
+                               camp::resources::Resource* res = nullptr) {
   if (!ptr || len == 0) {
     return;
   }
 
-  int device = detail::get_device_id(ptr);
+  int device = detail::get_device_id(ptr, res);
 
   #pragma omp target teams distribute parallel for is_device_ptr(ptr) device(device)
   for (std::size_t i = 0; i < len; i++) {
@@ -343,7 +363,7 @@ struct device_memset<resource::omp_target_platform> {
   static camp::resources::EventProxy<camp::resources::Resource> exec(
       T* ptr, V val, std::size_t len, camp::resources::Resource& res) {
     detail::omp_target_impl::wait_for_resource(res);
-    detail::omp_target_impl::device_memset_impl(ptr, static_cast<T>(val), len);
+    detail::omp_target_impl::device_memset_impl(ptr, static_cast<T>(val), len, &res);
     return camp::resources::EventProxy<camp::resources::Resource>{res};
   }
 };

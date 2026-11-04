@@ -32,8 +32,8 @@ static void BM_ResourceManager_Copy(benchmark::State& state, const std::string& 
   void* src_ptr = src_allocator.allocate(size);
   void* dst_ptr = dst_allocator.allocate(size);
 
-  // Initialize source data
-  std::memset(src_ptr, 0xAA, size);
+  // Initialize source data on the source allocator's backend.
+  umpire::memset(src_ptr, 0xAA, size);
 
   for (auto _ : state) {
     // Original ResourceManager approach (deprecated rm.copy takes (dst, src))
@@ -63,8 +63,8 @@ static void BM_RuntimeDispatch_Copy(benchmark::State& state, const std::string& 
   void* src_ptr = src_allocator.allocate(size);
   void* dst_ptr = dst_allocator.allocate(size);
 
-  // Initialize source data
-  std::memset(src_ptr, 0xBB, size);
+  // Initialize source data on the source allocator's backend.
+  umpire::memset(src_ptr, 0xBB, size);
 
   for (auto _ : state) {
     // Runtime dispatch - auto-detects platform from pointers

@@ -141,14 +141,40 @@ if (NOT TARGET camp)
       SCOPE INTERFACE
       TARGET_DEFINITIONS CAMP_ENABLE_SYCL)
   endif()
-
-  if(UMPIRE_ENABLE_OPENMP_TARGET)
-    blt_add_target_definitions(
-      TO camp
-      SCOPE INTERFACE
-      TARGET_DEFINITIONS CAMP_ENABLE_TARGET_OPENMP)
-  endif()
 endif ()
+
+if(UMPIRE_ENABLE_OPENMP_TARGET)
+  if(NOT TARGET openmp)
+    message(FATAL_ERROR "UMPIRE_ENABLE_OPENMP_TARGET requires ENABLE_OPENMP=ON")
+  endif()
+
+  get_target_property(umpire_camp_target camp ALIASED_TARGET)
+  if(NOT umpire_camp_target)
+    set(umpire_camp_target camp)
+  endif()
+
+  blt_add_target_definitions(
+    TO ${umpire_camp_target}
+    SCOPE INTERFACE
+    TARGET_DEFINITIONS CAMP_ENABLE_TARGET_OPENMP)
+  target_link_libraries(${umpire_camp_target} INTERFACE openmp)
+
+  # BLT object libraries copy only their dependencies' direct interface
+  # properties. Publish OpenMP's requirements on camp itself so those consumers
+  # (including umpire_event) compile CAMP's target headers with OpenMP enabled.
+  foreach(property
+      INTERFACE_COMPILE_OPTIONS
+      INTERFACE_COMPILE_DEFINITIONS
+      INTERFACE_INCLUDE_DIRECTORIES
+      INTERFACE_SYSTEM_INCLUDE_DIRECTORIES
+      INTERFACE_LINK_OPTIONS
+      INTERFACE_LINK_DIRECTORIES)
+    get_target_property(openmp_requirements openmp ${property})
+    if(openmp_requirements)
+      set_property(TARGET ${umpire_camp_target} APPEND PROPERTY ${property} ${openmp_requirements})
+    endif()
+  endforeach()
+endif()
 
 if (NOT TARGET ${UMPIRE_FMT_TARGET})
   if (DEFINED fmt_DIR)

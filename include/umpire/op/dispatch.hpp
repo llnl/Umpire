@@ -5,6 +5,7 @@
 
 #include "umpire/ResourceManager.hpp"
 #include "umpire/config.hpp"
+#include "umpire/event/event.hpp"
 #include "umpire/op/detail/traits.hpp"
 #include "umpire/op/detail/utils.hpp"
 #include "umpire/op/operations.hpp"
@@ -178,14 +179,12 @@ scope_exit<F> make_scope_exit(F f) {
 // Base template for op_caller with helper functions for argument handling
 template <template <typename...> class Op>
 struct op_caller {
-  // Get the last argument from a parameter pack
   template <typename... Args>
   static auto get_last_arg(Args... args)
   {
     return std::get<sizeof...(Args) - 1>(std::forward_as_tuple(args...));
   }
 
-  // Get the Nth argument from a parameter pack
   template <size_t N, typename... Args>
   static auto get_arg(Args... args)
   {
@@ -223,7 +222,6 @@ struct op_caller {
   static void check_copy_bounds(T* src, T* dst, const util::AllocationRecord* src_record,
                                 const util::AllocationRecord* dst_record, std::size_t size)
   {
-    // Calculate source and destination details
     std::ptrdiff_t src_offset = reinterpret_cast<const char*>(src) - reinterpret_cast<const char*>(src_record->ptr);
     if (src_offset < 0) {
       UMPIRE_ERROR(runtime_error, "Invalid source pointer for copy bounds check");
@@ -248,14 +246,12 @@ struct op_caller {
       return;
     }
 
-    // Check if source has enough data and destination has enough space
     if (requested_bytes > src_available_bytes) {
       UMPIRE_ERROR(runtime_error,
                    fmt::format("Not enough data in source to copy {} bytes from {} bytes", requested_bytes,
                                src_available_bytes));
     }
 
-    // Check if destination has enough space
     if (requested_bytes > dst_available_bytes) {
       UMPIRE_ERROR(runtime_error,
                    fmt::format("Not enough space in destination to copy {} bytes into {} bytes", requested_bytes,
@@ -285,7 +281,6 @@ struct op_caller {
            std::is_same_v<Op<resource::host_platform>, device_memset<resource::host_platform>>;
   }
 
-  // Single-pointer operations (synchronous)
   template <typename T, typename... Args>
   inline static auto exec(T* src, Args... args)
   {
@@ -294,20 +289,16 @@ struct op_caller {
     auto src_record = allocation_map.find(get_lookup_ptr(src));
     auto p = src_record->strategy->getPlatform();
 
-    // Operation-specific handling
     if constexpr (is_memset_op()) {
-      // For memset/device_memset, we expect args to be {value, size}
 #ifdef UMPIRE_ENABLE_BOUNDS_CHECKS
       std::size_t length = get_arg<1>(args...);
       check_memset_bounds(src, src_record, length);
 #endif
     }
 
-    // Dispatch based on platform
     return detail::dispatch<Op>(p, src, args...);
   }
 
-  // Single-pointer operations (asynchronous)
   template <typename T, typename... Args>
   inline static auto exec(T* src, Args... args, camp::resources::Resource& ctx)
   {
@@ -316,9 +307,7 @@ struct op_caller {
     auto src_record = allocation_map.find(get_lookup_ptr(src));
     auto p = src_record->strategy->getPlatform();
 
-    // Operation-specific handling
     if constexpr (is_memset_op()) {
-      // For memset/device_memset, we expect args to be {value, size}
 #ifdef UMPIRE_ENABLE_BOUNDS_CHECKS
       std::size_t length = get_arg<1>(args...);
       check_memset_bounds(src, src_record, length);
@@ -328,7 +317,6 @@ struct op_caller {
     return detail::dispatch<Op>(p, src, std::forward<Args>(args)..., ctx);
   }
 
-  // Dual-pointer operations (synchronous)
   template <typename T, typename... Args>
   inline static auto exec(T* src, T* dst, Args... args)
   {
@@ -340,21 +328,17 @@ struct op_caller {
     auto p1 = src_record->strategy->getPlatform();
     auto p2 = dst_record->strategy->getPlatform();
 
-    // Operation-specific handling for copy
     if constexpr (std::is_same_v<Op<resource::host_platform, resource::host_platform>,
                                  copy<resource::host_platform, resource::host_platform>>) {
-      // For copy, we expect args to be {size}
 #ifdef UMPIRE_ENABLE_BOUNDS_CHECKS
       std::size_t size = get_arg<0>(args...);
       check_copy_bounds(src, dst, src_record, dst_record, size);
 #endif
     }
 
-    // Dispatch based on source and destination platforms
     return detail::dispatch<Op>(p1, p2, src, dst, args...);
   }
 
-  // Dual-pointer operations (asynchronous)
   template <typename T, typename... Args>
   inline static auto exec(T* src, T* dst, Args... args, camp::resources::Resource& ctx)
   {
@@ -366,7 +350,6 @@ struct op_caller {
     auto p1 = src_record->strategy->getPlatform();
     auto p2 = dst_record->strategy->getPlatform();
 
-    // Operation-specific handling for copy
     if constexpr (std::is_same_v<Op<resource::host_platform, resource::host_platform>,
                                  copy<resource::host_platform, resource::host_platform>>) {
 #ifdef UMPIRE_ENABLE_BOUNDS_CHECKS
@@ -378,6 +361,89 @@ struct op_caller {
     return detail::dispatch<Op>(p1, p2, src, dst, std::forward<Args>(args)..., ctx);
   }
 };
+
+namespace detail {
+
+// Record only at public tracked-operation boundaries. Internal operations and
+// explicit-platform overloads dispatch directly without producing these events.
+template <typename T>
+void record_copy(T* src, T* dst, std::size_t len, bool async = false)
+{
+  umpire::event::record([&](auto& event) {
+    auto& rm = ResourceManager::getInstance();
+    auto src_record = rm.findAllocationRecord(src);
+    auto dst_record = rm.findAllocationRecord(dst);
+    event.name("copy")
+        .category(event::category::operation)
+        .arg("src", static_cast<void*>(src))
+        .arg("dst", static_cast<void*>(dst))
+        .arg("src_offset", reinterpret_cast<char*>(src) - static_cast<char*>(src_record->ptr))
+        .arg("dst_offset", reinterpret_cast<char*>(dst) - static_cast<char*>(dst_record->ptr))
+        .arg("size", get_size<T>(len))
+        .arg("src_allocator_ref", static_cast<void*>(src_record->strategy))
+        .arg("dst_allocator_ref", static_cast<void*>(dst_record->strategy))
+        .tag("src_allocator_name", src_record->strategy->getName())
+        .tag("dst_allocator_name", dst_record->strategy->getName())
+        .tag("replay", "true");
+    if (async) {
+      event.tag("async", "true");
+    }
+  });
+}
+
+template <typename T, typename V>
+void record_memset(T* ptr, V value, std::size_t len, bool async = false)
+{
+  umpire::event::record([&](auto& event) {
+    auto record = ResourceManager::getInstance().findAllocationRecord(ptr);
+    event.name("memset")
+        .category(event::category::operation)
+        .arg("ptr", static_cast<void*>(ptr))
+        .arg("value", static_cast<int>(value))
+        .arg("size", get_size<T>(len))
+        .arg("allocator_ref", static_cast<void*>(record->strategy))
+        .tag("allocator_name", record->strategy->getName())
+        .tag("replay", "true");
+    if (async) {
+      event.tag("async", "true");
+    }
+  });
+}
+
+template <typename T>
+strategy::AllocationStrategy* record_reallocate_begin(T* ptr, std::size_t len, bool async = false)
+{
+  strategy::AllocationStrategy* strategy = nullptr;
+  umpire::event::record([&](auto& event) {
+    auto& rm = ResourceManager::getInstance();
+    strategy = (ptr ? rm.getAllocator(ptr) : rm.getDefaultAllocator()).getAllocationStrategy();
+    event.name("reallocate")
+        .category(event::category::operation)
+        .arg("current_ptr", static_cast<void*>(ptr))
+        .arg("size", get_size<T>(len))
+        .arg("allocator_ref", static_cast<void*>(strategy))
+        .tag("allocator_name", strategy->getName())
+        .tag("replay", "true");
+    if (async) {
+      event.tag("async", "true");
+    }
+  });
+  return strategy;
+}
+
+template <typename T>
+void record_reallocate_end(T* ptr, strategy::AllocationStrategy* strategy)
+{
+  umpire::event::record([&](auto& event) {
+    event.name("reallocate")
+        .category(event::category::operation)
+        .arg("new_ptr", static_cast<void*>(ptr))
+        .arg("allocator_ref", static_cast<void*>(strategy))
+        .tag("allocator_name", strategy->getName());
+  });
+}
+
+} // namespace detail
 
 } // namespace op
 
@@ -433,18 +499,21 @@ struct op_caller {
 template <typename T>
 void copy(T* src, T* dst, std::size_t len)
 {
+  op::detail::record_copy(src, dst, len);
   op::op_caller<op::copy>::exec(src, dst, len);
 }
 
 template <typename T>
 auto copy(T* src, T* dst, std::size_t len, camp::resources::Resource& ctx)
 {
+  op::detail::record_copy(src, dst, len, true);
   return op::op_caller<op::copy>::exec(src, dst, len, ctx);
 }
 
 template <typename T, typename V>
 void memset(T* src, V v, std::size_t len)
 {
+  op::detail::record_memset(src, v, len);
   op::op_caller<op::memset>::exec(src, v, len);
 }
 
@@ -452,6 +521,7 @@ template <typename T>
 camp::resources::EventProxy<camp::resources::Resource> memset(T* src, int v, std::size_t len,
                                                               camp::resources::Resource& ctx)
 {
+  op::detail::record_memset(src, v, len, true);
   return op::op_caller<op::memset>::exec(src, v, len, ctx);
 }
 
@@ -473,11 +543,16 @@ camp::resources::EventProxy<camp::resources::Resource> device_memset(T* ptr, V v
 template <typename T>
 inline T* reallocate(T** src, std::size_t size)
 {
+  auto strategy = op::detail::record_reallocate_begin(*src, size);
+  T* result;
   // Handle nullptr specially - op_caller can't look up null in allocation map
   if (*src == nullptr) {
-    return op::reallocate<resource::host_platform>::exec(src, size);
+    result = op::reallocate<resource::host_platform>::exec(src, size);
+  } else {
+    result = op::op_caller<op::reallocate>::exec(src, size);
   }
-  return op::op_caller<op::reallocate>::exec(src, size);
+  op::detail::record_reallocate_end(result, strategy);
+  return result;
 }
 
 // Async reallocate implementation
@@ -485,11 +560,12 @@ template <typename T>
 inline camp::resources::EventProxy<camp::resources::Resource> reallocate(T** src, std::size_t size,
                                                                          camp::resources::Resource& ctx)
 {
+  auto strategy = op::detail::record_reallocate_begin(*src, size, true);
   // Handle nullptr specially - op_caller can't look up null in allocation map
-  if (*src == nullptr) {
-    return op::reallocate<resource::host_platform>::exec(src, size, ctx);
-  }
-  return op::op_caller<op::reallocate>::exec(src, size, ctx);
+  auto event = (*src == nullptr) ? op::reallocate<resource::host_platform>::exec(src, size, ctx)
+                                 : op::op_caller<op::reallocate>::exec(src, size, ctx);
+  op::detail::record_reallocate_end(*src, strategy);
+  return event;
 }
 
 // Synchronous prefetch implementation
@@ -569,7 +645,6 @@ PtrType* op::reallocate<Platform>::reallocate_impl_sync(PtrType** ptr_ptr, std::
 {
   PtrType* current_ptr = *ptr_ptr;
 
-  // 1. Null pointer case - just allocate
   if (!current_ptr) {
     auto& rm = ResourceManager::getInstance();
     Allocator allocator = rm.getDefaultAllocator();
@@ -581,23 +656,19 @@ PtrType* op::reallocate<Platform>::reallocate_impl_sync(PtrType** ptr_ptr, std::
     return new_ptr;
   }
 
-  // 2. Get allocator and validate
   auto& rm = ResourceManager::getInstance();
   auto& allocation_map = rm.m_allocations;
   Allocator allocator = rm.getAllocator(current_ptr);
 
-  // 3. Check for offset pointer
   auto alloc_record = allocation_map.find(current_ptr);
   if (current_ptr != alloc_record->ptr) {
     UMPIRE_ERROR(runtime_error, fmt::format("Cannot reallocate an offset ptr (ptr={}, base={})",
                                             reinterpret_cast<void*>(current_ptr), alloc_record->ptr));
   }
 
-  // 4. Calculate sizes
   std::size_t old_size = rm.getSize(current_ptr);
   std::size_t new_bytes = detail::get_size<PtrType>(new_size);
 
-  // 5. Zero-byte special case
   if (new_bytes == 0) {
     allocator.deallocate(current_ptr);
     PtrType* new_ptr = static_cast<PtrType*>(allocator.allocate(0));
@@ -605,10 +676,8 @@ PtrType* op::reallocate<Platform>::reallocate_impl_sync(PtrType** ptr_ptr, std::
     return new_ptr;
   }
 
-  // 6. Allocate new memory
   PtrType* new_ptr = static_cast<PtrType*>(allocator.allocate(new_bytes));
 
-  // 7. Copy data with exception safety
   std::size_t copy_bytes = (old_size > new_bytes) ? new_bytes : old_size;
 
   // Guard new pointer for exception safety
@@ -616,13 +685,10 @@ PtrType* op::reallocate<Platform>::reallocate_impl_sync(PtrType** ptr_ptr, std::
     allocator.deallocate(new_ptr);
   });
 
-  // Copy data using void* to pass bytes directly
-  umpire::copy(static_cast<void*>(current_ptr), static_cast<void*>(new_ptr), copy_bytes);
+  op::op_caller<op::copy>::exec(static_cast<void*>(current_ptr), static_cast<void*>(new_ptr), copy_bytes);
 
-  // Copy succeeded, deallocate old memory
   allocator.deallocate(current_ptr);
 
-  // All cleanup succeeded, dismiss guard and update pointer
   new_cleanup.dismiss();
   *ptr_ptr = new_ptr;
 
@@ -637,7 +703,6 @@ camp::resources::EventProxy<camp::resources::Resource> op::reallocate<Platform>:
 {
   PtrType* current_ptr = *ptr_ptr;
 
-  // 1. Null pointer case - just allocate
   if (!current_ptr) {
     auto& rm = ResourceManager::getInstance();
     Allocator allocator = rm.getDefaultAllocator();
@@ -649,23 +714,19 @@ camp::resources::EventProxy<camp::resources::Resource> op::reallocate<Platform>:
     return camp::resources::EventProxy<camp::resources::Resource>{ctx};
   }
 
-  // 2. Get allocator and validate
   auto& rm = ResourceManager::getInstance();
   auto& allocation_map = rm.m_allocations;
   Allocator allocator = rm.getAllocator(current_ptr);
 
-  // 3. Check for offset pointer
   auto alloc_record = allocation_map.find(current_ptr);
   if (current_ptr != alloc_record->ptr) {
     UMPIRE_ERROR(runtime_error, fmt::format("Cannot reallocate an offset ptr (ptr={}, base={})",
                                             reinterpret_cast<void*>(current_ptr), alloc_record->ptr));
   }
 
-  // 4. Calculate sizes
   std::size_t old_size = rm.getSize(current_ptr);
   std::size_t new_bytes = detail::get_size<PtrType>(new_size);
 
-  // 5. Zero-byte special case
   if (new_bytes == 0) {
     allocator.deallocate(current_ptr);
     PtrType* new_ptr = static_cast<PtrType*>(allocator.allocate(0));
@@ -673,7 +734,6 @@ camp::resources::EventProxy<camp::resources::Resource> op::reallocate<Platform>:
     return camp::resources::EventProxy<camp::resources::Resource>{ctx};
   }
 
-  // 6. Allocate new memory
   PtrType* new_ptr = static_cast<PtrType*>(allocator.allocate(new_bytes));
 
   // Guard new pointer for exception safety: if the copy below throws (or the
@@ -683,10 +743,9 @@ camp::resources::EventProxy<camp::resources::Resource> op::reallocate<Platform>:
     allocator.deallocate(new_ptr);
   });
 
-  // 7. Copy data asynchronously
   std::size_t copy_bytes = (old_size > new_bytes) ? new_bytes : old_size;
 
-  auto event = umpire::copy(static_cast<void*>(current_ptr), static_cast<void*>(new_ptr), copy_bytes, ctx);
+  auto event = op::op_caller<op::copy>::exec(static_cast<void*>(current_ptr), static_cast<void*>(new_ptr), copy_bytes, ctx);
 
   // NOTE: This wait is an intentional blocking point. It guarantees the copy
   // has completed before the old buffer is freed (and before we dismiss the
@@ -696,10 +755,8 @@ camp::resources::EventProxy<camp::resources::Resource> op::reallocate<Platform>:
   // event completes is left as a follow-up.
   static_cast<camp::resources::Event>(event).wait();
 
-  // Copy (and wait) succeeded, deallocate old memory
   allocator.deallocate(current_ptr);
 
-  // The new allocation is now the live one, dismiss its guard.
   new_cleanup.dismiss();
 
   *ptr_ptr = new_ptr;
@@ -844,47 +901,21 @@ std::enable_if_t<op::detail::supports_memory_advice<Platform>::value> unset_coar
 // Platform-by-Value API
 //------------------------------------------------------------------------------
 //
-// These functions accept camp::resources::Platform enum values as runtime
-// parameters, enabling explicit platform selection without allocation map lookups.
-// They delegate to the existing op::detail::dispatch() infrastructure.
+// These overloads take explicit camp::resources::Platform values for dispatch.
+// Host/CUDA/HIP copy and memset can operate on external pointers without map
+// lookups. SYCL/OpenMP use allocation records for tracked device pointers;
+// external device pointers require a Resource carrying their context/device.
+// Reallocate always requires a tracked pointer or nullptr.
+// These overloads do not record operation events (allocation events still apply).
 //
-// **When to Use This API**:
+// Thread safety: safe on different pointers; concurrent operations on the same
+// pointer require external synchronization.
 //
-// Use platform-by-value API when:
-// - Working with external memory NOT allocated by Umpire
-// - Performance profiling shows allocation map lookups are a bottleneck
-// - You need explicit runtime control over platform dispatch
-// - Testing or debugging requires precise platform specification
+// Errors: throw umpire::runtime_error for unsupported platform combinations
+// (e.g. direct CUDA<->HIP copy), platform-specific operation failures, and
+// resource/platform mismatches (e.g. a CUDA resource with Platform::hip).
 //
-// Use allocation-map-based API when:
-// - Working with Umpire-managed allocations (automatic platform detection)
-// - You want Umpire to track operations for replay/debugging
-// - Code readability is more important than avoiding map lookups
-// - You're unsure which to use (safer default)
-//
-// **Performance Considerations**:
-// - Platform-by-value API: O(1) dispatch, no map lookup
-// - Allocation-map API: O(log n) map lookup where n = number of allocations
-// - For small n (<1000 allocations), performance difference is negligible
-// - For large n or very hot paths, platform-by-value may provide 5-10% improvement
-//
-// **Platform Values**:
-// - Platform::host - CPU memory
-// - Platform::cuda - NVIDIA GPU memory
-// - Platform::hip - AMD GPU memory
-// - Platform::sycl - SYCL device memory
-// - Platform::omp_target - OpenMP target device memory
-//
-// **Thread Safety**: Functions are thread-safe when called on different pointers.
-// Concurrent operations on the same pointer are NOT thread-safe and require
-// external synchronization.
-//
-// **Error Handling**: Functions throw umpire::runtime_error for:
-// - Unsupported platform combinations (e.g., direct CUDA<->HIP copy)
-// - Platform-specific operation failures
-// - Resource type mismatches (e.g., CUDA resource with HIP platform)
-//
-// **Example Usage**:
+// Example:
 // ```cpp
 // // External memory not tracked by Umpire
 // float* external_gpu = /* from third-party library */;
@@ -905,9 +936,9 @@ std::enable_if_t<op::detail::supports_memory_advice<Platform>::value> unset_coar
 /**
  * @brief Copy memory between two pointers with explicit platform specification
  *
- * This function performs a memory copy without querying the allocation map,
- * allowing operations on external memory not tracked by Umpire's ResourceManager.
- * Useful for performance-critical code paths or when working with non-Umpire allocations.
+ * Host/CUDA/HIP support external pointers without allocation-map lookups.
+ * SYCL/OpenMP require tracked device pointers for this overload; use the
+ * Resource-taking overload for external device memory.
  *
  * @tparam T Type of data being copied (affects size calculation)
  * @param src_platform Platform where source memory resides (host, cuda, hip, sycl, omp_target)
@@ -919,9 +950,8 @@ std::enable_if_t<op::detail::supports_memory_advice<Platform>::value> unset_coar
  * **Thread Safety**: Safe to call from multiple threads on different pointers.
  * Concurrent operations on the same pointer are not thread-safe.
  *
- * **Performance**: Avoids allocation map lookup overhead (~O(log n) complexity).
- * For Umpire-managed memory, prefer the allocation-map-based API for automatic
- * platform detection unless performance profiling shows map lookup is a bottleneck.
+ * **Performance**: Host/CUDA/HIP avoid allocation-map lookup overhead.
+ * SYCL/OpenMP look up device pointers to select the owning queue/device.
  *
  * **Error Handling**: Throws runtime_error if platform combination is unsupported
  * or if the underlying platform operation fails.
@@ -938,7 +968,7 @@ void copy(camp::resources::Platform src_platform, camp::resources::Platform dst_
  *
  * Performs an asynchronous memory copy using the provided resource context.
  * The operation may execute concurrently with host code depending on platform
- * capabilities (true async on CUDA/HIP/SYCL, synchronous on OpenMP Target).
+ * capabilities (asynchronous on CUDA/HIP, blocking on SYCL/OpenMP Target).
  *
  * @tparam T Type of data being copied
  * @param src_platform Platform where source memory resides
@@ -950,12 +980,15 @@ void copy(camp::resources::Platform src_platform, camp::resources::Platform dst_
  *
  * @return EventProxy that can be waited on for completion
  *
- * **Resource Type**: The ctx parameter must match the src_platform/dst_platform.
- * Passing a CUDA resource when src_platform=Platform::host will throw an error.
+ * **Resource Type**: For copies involving device memory, ctx must match the
+ * device backend. Host-to-host copies wait for ctx before accessing memory.
+ * External SYCL device pointers must belong to the selected queue's context;
+ * external OpenMP device pointers must reside on ctx's device. Tracked device
+ * pointers retain their allocation-bound queue/device selection.
  *
  * **Platform-Specific Behavior**:
- * - CUDA/HIP/SYCL: True asynchronous execution on device stream/queue
- * - OpenMP Target: Synchronous execution (async API for compatibility only)
+ * - CUDA/HIP: Asynchronous execution on the device stream
+ * - SYCL/OpenMP Target: Blocking execution after prior resource work completes
  * - Host: Synchronous execution, returns completed event immediately
  */
 template <typename T>
@@ -968,8 +1001,9 @@ auto copy(camp::resources::Platform src_platform, camp::resources::Platform dst_
 /**
  * @brief Fill memory with a byte value using explicit platform specification
  *
- * Sets each byte in the memory region to the specified value. Works without
- * allocation map lookups, enabling operations on external memory.
+ * Sets each byte in the memory region to the specified value. Host/CUDA/HIP
+ * support external memory without allocation-map lookups. SYCL/OpenMP require
+ * a tracked device pointer; use the Resource-taking overload for external memory.
  *
  * @tparam T Type of pointer (affects size calculation)
  * @tparam V Type of value (typically int or unsigned char)
@@ -1001,8 +1035,8 @@ void memset(camp::resources::Platform platform, T* ptr, V value, std::size_t len
  *
  * @return EventProxy for completion synchronization
  *
- * **Platform-Specific Behavior**: See copy() async documentation for details
- * on platform-specific async behavior.
+ * **Platform-Specific Behavior**: See copy() async documentation for execution
+ * and external-pointer context/device requirements.
  */
 template <typename T>
 camp::resources::EventProxy<camp::resources::Resource> memset(camp::resources::Platform platform, T* ptr, int value,
@@ -1031,8 +1065,9 @@ camp::resources::EventProxy<camp::resources::Resource> memset(camp::resources::P
  * - OpenMP Target: Uses pragmas, works without Resource
  * - Host: Not supported (use memset or std::fill instead)
  *
- * **Important**: SYCL requires a Resource parameter even for "synchronous" calls
- * due to implementation details. Use the allocation-map API for SYCL device_memset.
+ * **Important**: SYCL requires a Resource parameter. This overload cannot be
+ * used for SYCL; use the tracked-pointer Resource-taking device_memset overload.
+ * OpenMP requires a tracked pointer to identify the owning device.
  */
 template <typename T, typename V>
 void device_memset(camp::resources::Platform platform, T* ptr, V value, std::size_t len)
@@ -1040,11 +1075,58 @@ void device_memset(camp::resources::Platform platform, T* ptr, V value, std::siz
   op::detail::dispatch<op::device_memset>(platform, ptr, value, len);
 }
 
+namespace op {
+namespace detail {
+
+inline Allocator get_reallocate_allocator(camp::resources::Platform platform, void* ptr)
+{
+  const char* resource_name;
+  switch (platform) {
+    case camp::resources::Platform::host:
+      resource_name = "HOST";
+      break;
+#if defined(UMPIRE_ENABLE_CUDA)
+    case camp::resources::Platform::cuda:
+#endif
+#if defined(UMPIRE_ENABLE_HIP)
+    case camp::resources::Platform::hip:
+#endif
+#if defined(UMPIRE_ENABLE_SYCL)
+    case camp::resources::Platform::sycl:
+#endif
+#if defined(UMPIRE_ENABLE_OPENMP_TARGET)
+    case camp::resources::Platform::omp_target:
+#endif
+#if defined(UMPIRE_ENABLE_CUDA) || defined(UMPIRE_ENABLE_HIP) || defined(UMPIRE_ENABLE_SYCL) || \
+    defined(UMPIRE_ENABLE_OPENMP_TARGET)
+      resource_name = "DEVICE";
+      break;
+#endif
+    default:
+      UMPIRE_ERROR(runtime_error, "Unsupported platform for reallocate");
+  }
+
+  auto& rm = ResourceManager::getInstance();
+  auto allocator = ptr ? rm.getAllocator(ptr) : rm.getDefaultAllocator();
+  if (!ptr && allocator.getPlatform() != platform) {
+    allocator = rm.getAllocator(resource_name);
+  }
+  if (allocator.getPlatform() != platform) {
+    UMPIRE_ERROR(runtime_error,
+                 fmt::format("Allocator \"{}\" does not match the requested reallocate platform {}",
+                             allocator.getName(), static_cast<int>(platform)));
+  }
+  return allocator;
+}
+
+} // namespace detail
+} // namespace op
+
 /**
  * @brief Reallocate typed pointer with explicit platform specification
  *
  * Resizes an allocation by allocating new memory, copying data, and freeing old memory.
- * Operates without allocation map, so the allocator must be determined from the platform.
+ * Non-null pointers must be tracked by Umpire and belong to the requested platform.
  *
  * @tparam T Element type
  * @param platform Platform where memory resides
@@ -1058,14 +1140,21 @@ void device_memset(camp::resources::Platform platform, T* ptr, V value, std::siz
  * - If size is 0, deallocates and returns zero-sized allocation
  * - Otherwise, allocates new memory, copies min(old_size, new_size) data, frees old
  *
- * **Allocator Selection**: Uses the default allocator for the specified platform.
- * For custom allocator control, use the allocation-map-based API or ResourceManager::reallocate().
+ * **Allocator Selection**: Retains the allocator of a non-null pointer. For a
+ * null pointer, uses the configured default if its platform matches; otherwise
+ * uses HOST or DEVICE and checks that it matches the requested platform.
+ * Throws if no matching allocator is available.
  *
  * **Exception Safety**: Strong guarantee for synchronous reallocate - *ptr unchanged on failure.
  */
 template <typename T>
 inline T* reallocate(camp::resources::Platform platform, T** ptr, std::size_t size)
 {
+  auto allocator = op::detail::get_reallocate_allocator(platform, *ptr);
+  if (!*ptr) {
+    *ptr = static_cast<T*>(allocator.allocate(op::detail::get_size<T>(size)));
+    return *ptr;
+  }
   return op::detail::dispatch<op::reallocate>(platform, ptr, size);
 }
 
@@ -1081,13 +1170,20 @@ inline T* reallocate(camp::resources::Platform platform, T** ptr, std::size_t si
  * @return EventProxy for completion synchronization
  *
  * **Exception Safety**: Basic guarantee - *ptr may be updated even if function throws.
- * Old memory is not freed until async copy completes.
+ * Old memory is not freed until the copy completes. Allocator selection and
+ * pointer/platform validation match the synchronous overload. For a null
+ * pointer this only allocates memory; it does not submit work to ctx.
  */
 template <typename T>
 inline camp::resources::EventProxy<camp::resources::Resource> reallocate(camp::resources::Platform platform, T** ptr,
                                                                          std::size_t size,
                                                                          camp::resources::Resource& ctx)
 {
+  auto allocator = op::detail::get_reallocate_allocator(platform, *ptr);
+  if (!*ptr) {
+    *ptr = static_cast<T*>(allocator.allocate(op::detail::get_size<T>(size)));
+    return camp::resources::EventProxy<camp::resources::Resource>{ctx};
+  }
   return op::detail::dispatch<op::reallocate>(platform, ptr, size, ctx);
 }
 
@@ -1104,7 +1200,7 @@ inline camp::resources::EventProxy<camp::resources::Resource> reallocate(camp::r
  */
 inline void* reallocate(camp::resources::Platform platform, void** ptr, std::size_t size)
 {
-  return op::detail::dispatch<op::reallocate>(platform, ptr, size);
+  return reallocate<void>(platform, ptr, size);
 }
 
 /**
@@ -1121,7 +1217,7 @@ inline camp::resources::EventProxy<camp::resources::Resource> reallocate(camp::r
                                                                          void** ptr, std::size_t size,
                                                                          camp::resources::Resource& ctx)
 {
-  return op::detail::dispatch<op::reallocate>(platform, ptr, size, ctx);
+  return reallocate<void>(platform, ptr, size, ctx);
 }
 
 /**
@@ -1140,7 +1236,7 @@ inline camp::resources::EventProxy<camp::resources::Resource> reallocate(camp::r
  * **Platform Support**:
  * - CUDA: Uses cudaMemPrefetchAsync, requires managed memory capability
  * - HIP: Uses hipMemPrefetchAsync, requires managed memory capability
- * - SYCL: Uses queue.prefetch()
+ * - SYCL: Requires the Resource-taking overload below
  * - OpenMP Target: No-op (not supported)
  * - Host: No-op (CPU has direct access)
  *
@@ -1165,6 +1261,9 @@ void prefetch(camp::resources::Platform platform, T* ptr, int device, std::size_
  * @param ctx Resource context for async execution
  *
  * @return EventProxy for completion synchronization
+ *
+ * SYCL uses the allocation-bound queue for tracked pointers and ctx's queue
+ * for external USM pointers in its context. This overload blocks on SYCL.
  */
 template <typename T>
 camp::resources::EventProxy<camp::resources::Resource> prefetch(camp::resources::Platform platform, T* ptr, int device,

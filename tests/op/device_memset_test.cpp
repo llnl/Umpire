@@ -44,32 +44,25 @@ TEST(DeviceMemset, TypedDeviceMemsetInt)
   }
   auto host_allocator = rm.getAllocator("HOST");
 
-  // Allocate device buffer for integers
   int* device_ptr = static_cast<int*>(device_allocator->allocate(num_elements * sizeof(int)));
 
-  // Allocate host buffer for initialization and verification
   int* host_ptr = static_cast<int*>(host_allocator.allocate(num_elements * sizeof(int)));
 
-  // Fill host buffer with pattern first
   for (std::size_t i = 0; i < num_elements; ++i) {
     host_ptr[i] = static_cast<int>(i);
   }
 
-  // Copy initial pattern to device
   umpire::copy(host_ptr, device_ptr, num_elements);
 
   // Use umpire::device_memset to set each element to value (pass element count for typed pointer)
   umpire::device_memset(device_ptr, value, num_elements);
 
-  // Copy back to host for verification
   umpire::copy(device_ptr, host_ptr, num_elements);
 
-  // Verify each int is set to the actual value
   for (std::size_t i = 0; i < num_elements; ++i) {
     ASSERT_EQ(host_ptr[i], 34) << "Device memset failed at element " << i;
   }
 
-  // Cleanup
   device_allocator->deallocate(device_ptr);
   host_allocator.deallocate(host_ptr);
 }
@@ -88,37 +81,28 @@ TEST(DeviceMemset, PartialDeviceMemset)
   }
   auto host_allocator = rm.getAllocator("HOST");
 
-  // Allocate device buffer for integers
   int* device_ptr = static_cast<int*>(device_allocator->allocate(total_elements * sizeof(int)));
 
-  // Allocate host buffer for initialization and verification
   int* host_ptr = static_cast<int*>(host_allocator.allocate(total_elements * sizeof(int)));
 
-  // Fill entire host buffer with initial value
   for (std::size_t i = 0; i < total_elements; ++i) {
     host_ptr[i] = initial_value;
   }
 
-  // Copy initial values to device
   umpire::copy(host_ptr, device_ptr, total_elements);
 
-  // Use umpire::device_memset on first half only
   umpire::device_memset(device_ptr, set_value, partial_elements);
 
-  // Copy back to host for verification
   umpire::copy(device_ptr, host_ptr, total_elements);
 
-  // Verify first half is set to new value
   for (std::size_t i = 0; i < partial_elements; ++i) {
     ASSERT_EQ(host_ptr[i], set_value) << "Device memset failed at element " << i;
   }
 
-  // Verify second half is unchanged
   for (std::size_t i = partial_elements; i < total_elements; ++i) {
     ASSERT_EQ(host_ptr[i], initial_value) << "Unchanged region modified at element " << i;
   }
 
-  // Cleanup
   device_allocator->deallocate(device_ptr);
   host_allocator.deallocate(host_ptr);
 }
@@ -136,32 +120,24 @@ TEST(DeviceMemset, ZeroSize)
   }
   auto host_allocator = rm.getAllocator("HOST");
 
-  // Allocate device buffer for integers
   int* device_ptr = static_cast<int*>(device_allocator->allocate(num_elements * sizeof(int)));
 
-  // Allocate host buffer for initialization and verification
   int* host_ptr = static_cast<int*>(host_allocator.allocate(num_elements * sizeof(int)));
 
-  // Fill host buffer with initial value
   for (std::size_t i = 0; i < num_elements; ++i) {
     host_ptr[i] = initial_value;
   }
 
-  // Copy initial values to device
   umpire::copy(host_ptr, device_ptr, num_elements);
 
-  // Use umpire::device_memset with zero size - should be no-op
   umpire::device_memset(device_ptr, memset_value, 0);
 
-  // Copy back to host for verification
   umpire::copy(device_ptr, host_ptr, num_elements);
 
-  // Verify buffer is unchanged
   for (std::size_t i = 0; i < num_elements; ++i) {
     ASSERT_EQ(host_ptr[i], initial_value) << "Zero-size device memset modified element " << i;
   }
 
-  // Cleanup
   device_allocator->deallocate(device_ptr);
   host_allocator.deallocate(host_ptr);
 }
@@ -178,28 +154,21 @@ TEST(DeviceMemset, DifferentValues)
   }
   auto host_allocator = rm.getAllocator("HOST");
 
-  // Allocate device buffer for integers
   int* device_ptr = static_cast<int*>(device_allocator->allocate(num_elements * sizeof(int)));
 
-  // Allocate host buffer for verification
   int* host_ptr = static_cast<int*>(host_allocator.allocate(num_elements * sizeof(int)));
 
-  // Test each value
   for (int test_value : test_values) {
-    // Use umpire::device_memset with test value on device memory
     umpire::device_memset(device_ptr, test_value, num_elements);
 
-    // Copy back to host for verification
     umpire::copy(device_ptr, host_ptr, num_elements);
 
-    // Verify all elements are set to test value
     for (std::size_t i = 0; i < num_elements; ++i) {
       ASSERT_EQ(host_ptr[i], test_value) << "Device memset failed for value " << test_value
                                          << " at element " << i;
     }
   }
 
-  // Cleanup
   device_allocator->deallocate(device_ptr);
   host_allocator.deallocate(host_ptr);
 }
@@ -218,24 +187,18 @@ TEST(DeviceMemset, CudaDeviceMemset)
   }
   auto host_allocator = rm.getAllocator("HOST");
 
-  // Allocate device buffer for integers
   int* device_ptr = static_cast<int*>(cuda_allocator->allocate(num_elements * sizeof(int)));
 
-  // Allocate host buffer for verification
   int* host_ptr = static_cast<int*>(host_allocator.allocate(num_elements * sizeof(int)));
 
-  // Use umpire::device_memset on device memory
   umpire::device_memset(device_ptr, value, num_elements);
 
-  // Copy back to host for verification
   umpire::copy(device_ptr, host_ptr, num_elements);
 
-  // Verify the memset was successful
   for (std::size_t i = 0; i < num_elements; ++i) {
     ASSERT_EQ(host_ptr[i], value) << "CUDA device memset failed at element " << i;
   }
 
-  // Cleanup
   cuda_allocator->deallocate(device_ptr);
   host_allocator.deallocate(host_ptr);
 }
@@ -252,24 +215,18 @@ TEST(DeviceMemset, ExplicitCudaDeviceMemset)
   }
   auto host_allocator = rm.getAllocator("HOST");
 
-  // Allocate device buffer for doubles
   double* device_ptr = static_cast<double*>(cuda_allocator->allocate(num_elements * sizeof(double)));
 
-  // Allocate host buffer for verification
   double* host_ptr = static_cast<double*>(host_allocator.allocate(num_elements * sizeof(double)));
 
-  // Use explicit platform device_memset
   umpire::device_memset<umpire::cuda>(device_ptr, value, num_elements);
 
-  // Copy back to host for verification
   umpire::copy(device_ptr, host_ptr, num_elements);
 
-  // Verify the memset was successful
   for (std::size_t i = 0; i < num_elements; ++i) {
     ASSERT_DOUBLE_EQ(host_ptr[i], value) << "Explicit CUDA device memset failed at element " << i;
   }
 
-  // Cleanup
   cuda_allocator->deallocate(device_ptr);
   host_allocator.deallocate(host_ptr);
 }
@@ -288,24 +245,18 @@ TEST(DeviceMemset, HipDeviceMemset)
   }
   auto host_allocator = rm.getAllocator("HOST");
 
-  // Allocate device buffer for integers
   int* device_ptr = static_cast<int*>(hip_allocator->allocate(num_elements * sizeof(int)));
 
-  // Allocate host buffer for verification
   int* host_ptr = static_cast<int*>(host_allocator.allocate(num_elements * sizeof(int)));
 
-  // Use umpire::device_memset on device memory
   umpire::device_memset(device_ptr, value, num_elements);
 
-  // Copy back to host for verification
   umpire::copy(device_ptr, host_ptr, num_elements);
 
-  // Verify the memset was successful
   for (std::size_t i = 0; i < num_elements; ++i) {
     ASSERT_EQ(host_ptr[i], value) << "HIP device memset failed at element " << i;
   }
 
-  // Cleanup
   hip_allocator->deallocate(device_ptr);
   host_allocator.deallocate(host_ptr);
 }
@@ -322,24 +273,18 @@ TEST(DeviceMemset, ExplicitHipDeviceMemset)
   }
   auto host_allocator = rm.getAllocator("HOST");
 
-  // Allocate device buffer for floats
   float* device_ptr = static_cast<float*>(hip_allocator->allocate(num_elements * sizeof(float)));
 
-  // Allocate host buffer for verification
   float* host_ptr = static_cast<float*>(host_allocator.allocate(num_elements * sizeof(float)));
 
-  // Use explicit platform device_memset
   umpire::device_memset<umpire::hip>(device_ptr, value, num_elements);
 
-  // Copy back to host for verification
   umpire::copy(device_ptr, host_ptr, num_elements);
 
-  // Verify the memset was successful
   for (std::size_t i = 0; i < num_elements; ++i) {
     ASSERT_FLOAT_EQ(host_ptr[i], value) << "Explicit HIP device memset failed at element " << i;
   }
 
-  // Cleanup
   hip_allocator->deallocate(device_ptr);
   host_allocator.deallocate(host_ptr);
 }
@@ -365,13 +310,10 @@ TEST(DeviceMemset, ExplicitPlatformCuda)
   int* device_ptr = static_cast<int*>(cuda_allocator->allocate(num_elements * sizeof(int)));
   int* host_ptr = static_cast<int*>(host_allocator.allocate(num_elements * sizeof(int)));
 
-  // Use explicit platform device_memset
   umpire::device_memset(camp::resources::Platform::cuda, device_ptr, value, num_elements);
 
-  // Copy back to verify
   umpire::copy(device_ptr, host_ptr, num_elements);
 
-  // Verify
   for (std::size_t i = 0; i < num_elements; ++i) {
     ASSERT_EQ(host_ptr[i], value) << "Device memset failed at element " << i;
   }
@@ -395,13 +337,10 @@ TEST(DeviceMemset, ExplicitPlatformCudaDouble)
   double* device_ptr = static_cast<double*>(cuda_allocator->allocate(num_elements * sizeof(double)));
   double* host_ptr = static_cast<double*>(host_allocator.allocate(num_elements * sizeof(double)));
 
-  // Use explicit platform device_memset with double value
   umpire::device_memset(camp::resources::Platform::cuda, device_ptr, value, num_elements);
 
-  // Copy back to verify
   umpire::copy(device_ptr, host_ptr, num_elements);
 
-  // Verify
   for (std::size_t i = 0; i < num_elements; ++i) {
     ASSERT_DOUBLE_EQ(host_ptr[i], value) << "Device memset failed at element " << i;
   }
@@ -427,13 +366,10 @@ TEST(DeviceMemset, ExplicitPlatformHip)
   int* device_ptr = static_cast<int*>(hip_allocator->allocate(num_elements * sizeof(int)));
   int* host_ptr = static_cast<int*>(host_allocator.allocate(num_elements * sizeof(int)));
 
-  // Use explicit platform device_memset
   umpire::device_memset(camp::resources::Platform::hip, device_ptr, value, num_elements);
 
-  // Copy back to verify
   umpire::copy(device_ptr, host_ptr, num_elements);
 
-  // Verify
   for (std::size_t i = 0; i < num_elements; ++i) {
     ASSERT_EQ(host_ptr[i], value) << "Device memset failed at element " << i;
   }

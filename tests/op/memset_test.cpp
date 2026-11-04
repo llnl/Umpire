@@ -21,22 +21,17 @@ TEST(Memset, HostMemsetBasic)
   auto& rm = umpire::ResourceManager::getInstance();
   auto allocator = rm.getAllocator("HOST");
 
-  // Allocate buffer
   void* ptr = allocator.allocate(size);
 
-  // Fill with different pattern first
   std::memset(ptr, 0xAA, size);
 
-  // Use umpire::memset to set to value
   umpire::memset(ptr, value, size);
 
-  // Verify the memset was successful
   unsigned char* byte_ptr = static_cast<unsigned char*>(ptr);
   for (std::size_t i = 0; i < size; ++i) {
     ASSERT_EQ(byte_ptr[i], value) << "Memset failed at byte " << i;
   }
 
-  // Cleanup
   allocator.deallocate(ptr);
 }
 
@@ -48,10 +43,8 @@ TEST(Memset, TypedMemsetInt)
   auto& rm = umpire::ResourceManager::getInstance();
   auto allocator = rm.getAllocator("HOST");
 
-  // Allocate buffer for integers
   int* ptr = static_cast<int*>(allocator.allocate(num_elements * sizeof(int)));
 
-  // Fill with pattern first
   for (std::size_t i = 0; i < num_elements; ++i) {
     ptr[i] = static_cast<int>(i);
   }
@@ -59,12 +52,10 @@ TEST(Memset, TypedMemsetInt)
   // Use umpire::memset to zero out (pass element count for typed pointer)
   umpire::memset(ptr, value, num_elements);
 
-  // Verify each int is zero
   for (std::size_t i = 0; i < num_elements; ++i) {
     ASSERT_EQ(ptr[i], 0) << "Memset failed at element " << i;
   }
 
-  // Cleanup
   allocator.deallocate(ptr);
 }
 
@@ -78,26 +69,20 @@ TEST(Memset, PartialMemset)
   auto& rm = umpire::ResourceManager::getInstance();
   auto allocator = rm.getAllocator("HOST");
 
-  // Allocate buffer
   unsigned char* ptr = static_cast<unsigned char*>(allocator.allocate(total_size));
 
-  // Fill entire buffer with initial pattern
   std::memset(ptr, initial_value, total_size);
 
-  // Use umpire::memset on first half only
   umpire::memset(ptr, set_value, partial_size);
 
-  // Verify first half is set to new value
   for (std::size_t i = 0; i < partial_size; ++i) {
     ASSERT_EQ(ptr[i], set_value) << "Memset failed at byte " << i;
   }
 
-  // Verify second half is unchanged
   for (std::size_t i = partial_size; i < total_size; ++i) {
     ASSERT_EQ(ptr[i], initial_value) << "Unchanged region modified at byte " << i;
   }
 
-  // Cleanup
   allocator.deallocate(ptr);
 }
 
@@ -110,21 +95,16 @@ TEST(Memset, ZeroSize)
   auto& rm = umpire::ResourceManager::getInstance();
   auto allocator = rm.getAllocator("HOST");
 
-  // Allocate buffer
   unsigned char* ptr = static_cast<unsigned char*>(allocator.allocate(size));
 
-  // Fill with initial pattern
   std::memset(ptr, initial_value, size);
 
-  // Use umpire::memset with zero size - should be no-op
   umpire::memset(ptr, memset_value, 0);
 
-  // Verify buffer is unchanged
   for (std::size_t i = 0; i < size; ++i) {
     ASSERT_EQ(ptr[i], initial_value) << "Zero-size memset modified byte " << i;
   }
 
-  // Cleanup
   allocator.deallocate(ptr);
 }
 
@@ -136,22 +116,17 @@ TEST(Memset, DifferentValues)
   auto& rm = umpire::ResourceManager::getInstance();
   auto allocator = rm.getAllocator("HOST");
 
-  // Allocate buffer
   unsigned char* ptr = static_cast<unsigned char*>(allocator.allocate(size));
 
-  // Test each value
   for (unsigned char test_value : test_values) {
-    // Use umpire::memset with test value
     umpire::memset(ptr, test_value, size);
 
-    // Verify all bytes are set to test value
     for (std::size_t i = 0; i < size; ++i) {
       ASSERT_EQ(ptr[i], test_value) << "Memset failed for value 0x" << std::hex << static_cast<int>(test_value)
                                     << " at byte " << std::dec << i;
     }
   }
 
-  // Cleanup
   allocator.deallocate(ptr);
 }
 
@@ -164,16 +139,13 @@ TEST(Memset, TypedOutOfBounds)
   auto& rm = umpire::ResourceManager::getInstance();
   auto allocator = rm.getAllocator("HOST");
 
-  // Allocate buffer of num_elements doubles
   double* ptr = static_cast<double*>(allocator.allocate(num_elements * sizeof(double)));
 
-  // In-bounds typed memset succeeds
   ASSERT_NO_THROW(umpire::memset(ptr, 0, num_elements));
 
   // One element past the end overruns the buffer by sizeof(double) bytes
   ASSERT_THROW(umpire::memset(ptr, 0, num_elements + 1), umpire::runtime_error);
 
-  // Cleanup
   allocator.deallocate(ptr);
 }
 #endif // UMPIRE_ENABLE_BOUNDS_CHECKS
@@ -188,24 +160,18 @@ TEST(Memset, CudaMemset)
   auto cuda_allocator = rm.getAllocator("DEVICE");
   auto host_allocator = rm.getAllocator("HOST");
 
-  // Allocate device buffer
   unsigned char* device_ptr = static_cast<unsigned char*>(cuda_allocator.allocate(size));
 
-  // Allocate host buffer for verification
   unsigned char* host_ptr = static_cast<unsigned char*>(host_allocator.allocate(size));
 
-  // Use umpire::memset on device memory
   umpire::memset(device_ptr, value, size);
 
-  // Copy back to host for verification
   umpire::copy(device_ptr, host_ptr, size);
 
-  // Verify the memset was successful
   for (std::size_t i = 0; i < size; ++i) {
     ASSERT_EQ(host_ptr[i], value) << "CUDA memset failed at byte " << i;
   }
 
-  // Cleanup
   cuda_allocator.deallocate(device_ptr);
   host_allocator.deallocate(host_ptr);
 }
@@ -219,24 +185,18 @@ TEST(Memset, ExplicitCudaMemset)
   auto cuda_allocator = rm.getAllocator("DEVICE");
   auto host_allocator = rm.getAllocator("HOST");
 
-  // Allocate device buffer
   unsigned char* device_ptr = static_cast<unsigned char*>(cuda_allocator.allocate(size));
 
-  // Allocate host buffer for verification
   unsigned char* host_ptr = static_cast<unsigned char*>(host_allocator.allocate(size));
 
-  // Use explicit platform memset
   umpire::memset<umpire::cuda>(device_ptr, value, size);
 
-  // Copy back to host for verification
   umpire::copy(device_ptr, host_ptr, size);
 
-  // Verify the memset was successful
   for (std::size_t i = 0; i < size; ++i) {
     ASSERT_EQ(host_ptr[i], value) << "Explicit CUDA memset failed at byte " << i;
   }
 
-  // Cleanup
   cuda_allocator.deallocate(device_ptr);
   host_allocator.deallocate(host_ptr);
 }
@@ -252,24 +212,18 @@ TEST(Memset, HipMemset)
   auto hip_allocator = rm.getAllocator("DEVICE");
   auto host_allocator = rm.getAllocator("HOST");
 
-  // Allocate device buffer
   unsigned char* device_ptr = static_cast<unsigned char*>(hip_allocator.allocate(size));
 
-  // Allocate host buffer for verification
   unsigned char* host_ptr = static_cast<unsigned char*>(host_allocator.allocate(size));
 
-  // Use umpire::memset on device memory
   umpire::memset(device_ptr, value, size);
 
-  // Copy back to host for verification
   umpire::copy(device_ptr, host_ptr, size);
 
-  // Verify the memset was successful
   for (std::size_t i = 0; i < size; ++i) {
     ASSERT_EQ(host_ptr[i], value) << "HIP memset failed at byte " << i;
   }
 
-  // Cleanup
   hip_allocator.deallocate(device_ptr);
   host_allocator.deallocate(host_ptr);
 }
@@ -283,24 +237,18 @@ TEST(Memset, ExplicitHipMemset)
   auto hip_allocator = rm.getAllocator("DEVICE");
   auto host_allocator = rm.getAllocator("HOST");
 
-  // Allocate device buffer
   unsigned char* device_ptr = static_cast<unsigned char*>(hip_allocator.allocate(size));
 
-  // Allocate host buffer for verification
   unsigned char* host_ptr = static_cast<unsigned char*>(host_allocator.allocate(size));
 
-  // Use explicit platform memset
   umpire::memset<umpire::hip>(device_ptr, value, size);
 
-  // Copy back to host for verification
   umpire::copy(device_ptr, host_ptr, size);
 
-  // Verify the memset was successful
   for (std::size_t i = 0; i < size; ++i) {
     ASSERT_EQ(host_ptr[i], value) << "Explicit HIP memset failed at byte " << i;
   }
 
-  // Cleanup
   hip_allocator.deallocate(device_ptr);
   host_allocator.deallocate(host_ptr);
 }
@@ -314,27 +262,20 @@ TEST(Memset, HostMemsetAsync)
   auto& rm = umpire::ResourceManager::getInstance();
   auto allocator = rm.getAllocator("HOST");
 
-  // Allocate buffer
   unsigned char* ptr = static_cast<unsigned char*>(allocator.allocate(size));
 
-  // Fill with different pattern first
   std::memset(ptr, 0xAA, size);
 
-  // Create host resource for async operation
   camp::resources::Resource host_ctx{camp::resources::Host{}};
 
-  // Use async memset
   auto event = umpire::memset(ptr, value, size, host_ctx);
 
-  // Wait for async operation to complete
   static_cast<camp::resources::Event>(event).wait();
 
-  // Verify the memset was successful
   for (std::size_t i = 0; i < size; ++i) {
     ASSERT_EQ(ptr[i], value) << "Async host memset failed at byte " << i;
   }
 
-  // Cleanup
   allocator.deallocate(ptr);
 }
 
@@ -348,30 +289,22 @@ TEST(Memset, CudaMemsetAsync)
   auto cuda_allocator = rm.getAllocator("DEVICE");
   auto host_allocator = rm.getAllocator("HOST");
 
-  // Allocate device buffer
   unsigned char* device_ptr = static_cast<unsigned char*>(cuda_allocator.allocate(size));
 
-  // Allocate host buffer for verification
   unsigned char* host_ptr = static_cast<unsigned char*>(host_allocator.allocate(size));
 
-  // Create CUDA resource for async operation
   camp::resources::Resource cuda_ctx{camp::resources::Cuda{}};
 
-  // Use async memset on device memory
   auto event = umpire::memset(device_ptr, value, size, cuda_ctx);
 
-  // Wait for async operation to complete
   static_cast<camp::resources::Event>(event).wait();
 
-  // Copy back to host for verification
   umpire::copy(device_ptr, host_ptr, size);
 
-  // Verify the memset was successful
   for (std::size_t i = 0; i < size; ++i) {
     ASSERT_EQ(host_ptr[i], value) << "Async CUDA memset failed at byte " << i;
   }
 
-  // Cleanup
   cuda_allocator.deallocate(device_ptr);
   host_allocator.deallocate(host_ptr);
 }
@@ -391,13 +324,10 @@ TEST(Memset, ExplicitPlatformHost)
 
   unsigned char* ptr = static_cast<unsigned char*>(allocator.allocate(size));
 
-  // Fill with initial pattern
   std::memset(ptr, 0xAA, size);
 
-  // Use explicit platform memset
   umpire::memset(camp::resources::Platform::host, ptr, value, size);
 
-  // Verify
   for (std::size_t i = 0; i < size; ++i) {
     ASSERT_EQ(ptr[i], value) << "Memset failed at byte " << i;
   }
@@ -415,19 +345,14 @@ TEST(Memset, ExplicitPlatformHostAsync)
 
   unsigned char* ptr = static_cast<unsigned char*>(allocator.allocate(size));
 
-  // Fill with initial pattern
   std::memset(ptr, 0xBB, size);
 
-  // Create host resource
   camp::resources::Resource host_ctx{camp::resources::Host{}};
 
-  // Use explicit platform async memset
   auto event = umpire::memset(camp::resources::Platform::host, ptr, value, size, host_ctx);
 
-  // Wait for completion
   static_cast<camp::resources::Event>(event).wait();
 
-  // Verify
   for (std::size_t i = 0; i < size; ++i) {
     ASSERT_EQ(ptr[i], value) << "Async memset failed at byte " << i;
   }
@@ -448,13 +373,10 @@ TEST(Memset, ExplicitPlatformCuda)
   unsigned char* device_ptr = static_cast<unsigned char*>(cuda_allocator.allocate(size));
   unsigned char* host_ptr = static_cast<unsigned char*>(host_allocator.allocate(size));
 
-  // Use explicit platform memset on device
   umpire::memset(camp::resources::Platform::cuda, device_ptr, value, size);
 
-  // Copy back to verify
   umpire::copy(device_ptr, host_ptr, size);
 
-  // Verify
   for (std::size_t i = 0; i < size; ++i) {
     ASSERT_EQ(host_ptr[i], value) << "CUDA memset failed at byte " << i;
   }
@@ -475,19 +397,14 @@ TEST(Memset, ExplicitPlatformCudaAsync)
   unsigned char* device_ptr = static_cast<unsigned char*>(cuda_allocator.allocate(size));
   unsigned char* host_ptr = static_cast<unsigned char*>(host_allocator.allocate(size));
 
-  // Create CUDA resource
   camp::resources::Resource cuda_ctx{camp::resources::Cuda{}};
 
-  // Use explicit platform async memset on device
   auto event = umpire::memset(camp::resources::Platform::cuda, device_ptr, value, size, cuda_ctx);
 
-  // Wait for completion
   static_cast<camp::resources::Event>(event).wait();
 
-  // Copy back to verify
   umpire::copy(device_ptr, host_ptr, size);
 
-  // Verify
   for (std::size_t i = 0; i < size; ++i) {
     ASSERT_EQ(host_ptr[i], value) << "Async CUDA memset failed at byte " << i;
   }

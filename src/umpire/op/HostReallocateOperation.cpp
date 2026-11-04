@@ -30,7 +30,7 @@ void HostReallocateOperation::transform(void* current_ptr, void** new_ptr, util:
     *new_ptr = allocator.allocate(new_size);
     const std::size_t copy_size = (old_size > new_size) ? new_size : old_size;
 
-    umpire::copy(current_ptr, *new_ptr, copy_size);
+    op::op_caller<op::copy>::exec(current_ptr, *new_ptr, copy_size);
     allocator.deallocate(current_ptr);
   } else {
     auto old_record = ResourceManager::getInstance().deregisterAllocation(current_ptr);
