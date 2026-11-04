@@ -1,8 +1,8 @@
 .. _resource_aware_pool:
 
-=============================
+==============================
 Creating a Resource Aware Pool
-=============================
+==============================
 
 This recipe describes how to create and use an Umpire ``ResourceAwarePool``. This pool is somewhat advanced
 so we also provide a bit of background on Camp resources which are used to track resources and events.
@@ -27,6 +27,7 @@ Generic vs. Specific Camp Resources
 Camp has two different types of Resources: generic and specific. A specific resource is created with:
 
 .. code-block:: bash
+
    camp::resources::Cuda c1;
 
 This will create a Cuda (specific) resource. With ``c1`` we can call different methods like ``get_platform()``
@@ -34,12 +35,14 @@ or ``get_stream()``. Parts of Umpire such as the Operations use these camp metho
 other hand, a generic resource is created with:
 
 .. code-block:: bash
+
    camp::resources::Resource r{c1};
 
 This way of creating a generic resource uses the specific resource created above, ``c1``, to constuct it.
 We can also create a generic resource with:
 
-.. code-blcok:: bash
+.. code-block:: bash
+
    camp::resources::Resource r{camp::resources::Cuda()};
 
 The ``ResourceAwarePool`` stores a generic camp resource, but since the compiler can implicitly convert a 
