@@ -149,6 +149,95 @@ TEST(FixedMallocPoolSmallObjectTest, IntSizedObjects)
   small_pool.deallocate(b);
 }
 
+TEST(FixedMallocPoolSmallObjectTest, Issue932OneByteObjects)
+{
+  // Deterministic reproducer from #932: fill the pool, then free in allocation order.
+  constexpr std::size_t count = 3966;
+  umpire::util::FixedMallocPool small_pool{1, count};
+  std::vector<void*> ptrs;
+  for (std::size_t i = 0; i < count; ++i) {
+    void* ptr = small_pool.allocate(1);
+    ASSERT_NE(ptr, nullptr);
+    ptrs.push_back(ptr);
+  }
+  for (void* ptr : ptrs) {
+    small_pool.deallocate(ptr);
+  }
+
+  // The free-list links must also remain intact for subsequent allocations.
+  for (auto it = ptrs.rbegin(); it != ptrs.rend(); ++it) {
+    ASSERT_EQ(small_pool.allocate(1), *it);
+  }
+  ASSERT_EQ(small_pool.numPools(), 1);
+  for (void* ptr : ptrs) {
+    small_pool.deallocate(ptr);
+  }
+}
+
+class FixedMallocPoolObjectSizeTest : public ::testing::TestWithParam<std::size_t> {};
+
+TEST_P(FixedMallocPoolObjectSizeTest, SingleSlot)
+{
+  // A link that is too large for the slot overruns the backing allocation.
+  const std::size_t bytes = GetParam();
+  umpire::util::FixedMallocPool small_pool{bytes, 1};
+  void* ptr = small_pool.allocate(bytes);
+  ASSERT_NE(ptr, nullptr);
+  std::memset(ptr, 0x5a, bytes);
+  small_pool.deallocate(ptr);
+  ASSERT_EQ(small_pool.allocate(bytes), ptr);
+  small_pool.deallocate(ptr);
+}
+
+TEST_P(FixedMallocPoolObjectSizeTest, PreservesLiveObjectsAcrossReuseAndGrowth)
+{
+  const std::size_t bytes = GetParam();
+  umpire::util::FixedMallocPool small_pool{bytes, 8};
+  const std::size_t pool_bytes = small_pool.totalBytes();
+  std::vector<void*> ptrs;
+  for (std::size_t i = 0; i < 9; ++i) {
+    void* ptr = small_pool.allocate(bytes);
+    ASSERT_NE(ptr, nullptr);
+    std::memset(ptr, static_cast<int>(i + 1), bytes);
+    ptrs.push_back(ptr);
+  }
+  ASSERT_EQ(small_pool.numPools(), 2);
+  ASSERT_EQ(small_pool.totalBytes(), 2 * pool_bytes);
+
+  for (std::size_t i = 0; i < ptrs.size(); i += 2) {
+    small_pool.deallocate(ptrs[i]);
+  }
+  // Free-list writes must not overwrite neighboring objects that are still live.
+  for (std::size_t i = 1; i < ptrs.size(); i += 2) {
+    const auto* data = static_cast<const unsigned char*>(ptrs[i]);
+    for (std::size_t j = 0; j < bytes; ++j) {
+      ASSERT_EQ(data[j], static_cast<unsigned char>(i + 1));
+    }
+  }
+
+  for (std::size_t i = 0; i < ptrs.size(); i += 2) {
+    ptrs[i] = small_pool.allocate(bytes);
+    ASSERT_NE(ptrs[i], nullptr);
+    std::memset(ptrs[i], static_cast<int>(i + 1), bytes);
+  }
+  ASSERT_EQ(small_pool.numPools(), 2);
+  ASSERT_EQ(small_pool.totalBytes(), 2 * pool_bytes);
+  std::set<void*> unique{ptrs.begin(), ptrs.end()};
+  ASSERT_EQ(unique.size(), ptrs.size());
+  for (std::size_t i = 0; i < ptrs.size(); ++i) {
+    const auto* data = static_cast<const unsigned char*>(ptrs[i]);
+    for (std::size_t j = 0; j < bytes; ++j) {
+      ASSERT_EQ(data[j], static_cast<unsigned char>(i + 1));
+    }
+  }
+  for (auto it = ptrs.rbegin(); it != ptrs.rend(); ++it) {
+    small_pool.deallocate(*it);
+  }
+}
+
+// Include sizes smaller than a link and sizes that do not align unsigned int.
+INSTANTIATE_TEST_SUITE_P(ObjectBytes, FixedMallocPoolObjectSizeTest, ::testing::Range(std::size_t{1}, std::size_t{17}));
+
 TEST_F(FixedMallocPoolTest, DeallocateUnknownPointer)
 {
   int not_from_pool;

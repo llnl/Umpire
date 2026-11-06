@@ -24,6 +24,12 @@ class FixedMallocPool {
  public:
   FixedMallocPool() = delete;
 
+  /*!
+   * \brief Construct a pool for objects of object_bytes bytes (must be nonzero).
+   *
+   * Slots smaller than a free-list index are padded internally. totalBytes()
+   * includes this padding.
+   */
   FixedMallocPool(const std::size_t object_bytes, const std::size_t objects_per_pool = 1024 * 1024);
 
   // Copy construction is not allowed. Doing so would create two
@@ -46,9 +52,9 @@ class FixedMallocPool {
  private:
   struct Pool {
     unsigned char* data;
-    unsigned int free_list;  // index of first recycled slot; linked through the
-                             // slots' own storage, objects_per_pool = end of list
-    unsigned int num_used;   // high-water mark: slots ever handed out
+    unsigned int free_list; // index of first recycled slot; linked through the
+                            // slots' own storage, objects_per_pool = end of list
+    unsigned int num_used;  // high-water mark: slots ever handed out
     Pool(const std::size_t object_bytes, const std::size_t objects_per_pool);
   };
 
@@ -62,6 +68,7 @@ class FixedMallocPool {
   unsigned int index_from_addr(const Pool& p, const unsigned char* ptr) const;
 
   const std::size_t m_obj_bytes;
+  const std::size_t m_slot_bytes;
   const std::size_t m_obj_per_pool;
   const std::size_t m_data_bytes;
   std::vector<Pool> m_pool;
