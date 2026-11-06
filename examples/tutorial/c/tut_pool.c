@@ -27,9 +27,9 @@ int main()
   double* data = (double*) umpire_allocator_allocate(&pool, SIZE*sizeof(double));
 
   printf("Allocated %lu bytes using the %s allocator...", 
-      (SIZE*sizeof(double)), umpire_allocator_get_name(&allocator));
+      (SIZE*sizeof(double)), umpire_allocator_get_name(&pool));
 
-  umpire_allocator_deallocate(&allocator, data);
+  umpire_allocator_deallocate(&pool, data);
   /* _sphinx_tag_tut_allocate_end */
 
   printf("deallocated.\n");

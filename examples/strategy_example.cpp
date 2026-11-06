@@ -60,9 +60,9 @@ int main(int, char**)
    */
   alloc = rm.getAllocator("MONOTONIC 1024");
   test = alloc.allocate(14);
-  alloc.deallocate(test);
 
   std::cout << "Size: " << alloc.getSize(test) << std::endl;
+  alloc.deallocate(test);
 
   std::cout << "Available allocators: ";
   for (auto s : rm.getAllocatorNames()) {

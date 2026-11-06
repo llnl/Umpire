@@ -67,7 +67,8 @@ void* FixedMallocPool::allocInPool(Pool& p) noexcept
 {
   if (p.free_list < m_obj_per_pool) {
     unsigned char* ret = addr_from_index(p, p.free_list);
-    p.free_list = *reinterpret_cast<unsigned int*>(ret);
+    // Slot sizes need not preserve unsigned int alignment.
+    std::memcpy(&p.free_list, ret, sizeof(p.free_list));
     return static_cast<void*>(ret);
   }
 
@@ -112,7 +113,7 @@ void FixedMallocPool::deallocate(void* ptr)
     const unsigned char* t_ptr = reinterpret_cast<unsigned char*>(ptr);
     const ptrdiff_t offset = t_ptr - p.data;
     if ((offset >= 0) && (offset < static_cast<ptrdiff_t>(m_data_bytes))) {
-      *reinterpret_cast<unsigned int*>(ptr) = p.free_list;
+      std::memcpy(ptr, &p.free_list, sizeof(p.free_list));
       p.free_list = index_from_addr(p, t_ptr);
       return;
     }
