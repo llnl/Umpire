@@ -1,0 +1,92 @@
+name: CUDA tests (simulated H100)
+
+# Optional, non-required check. The hosted runners have no GPU, so this builds
+# Umpire with CUDA and runs the ctest suite on a simulated NVIDIA H100
+# (https://github.com/pantheongpu/pantheonsim). A simulator cannot reproduce
+# hardware-specific behavior or timing, so it complements real-GPU testing and
+# does not replace it.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "cmake/**"
+      - "CMakeLists.txt"
+      - ".github/workflows/gpu-sim.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  cuda-sim:
+    name: CUDA 13.0, simulated H100
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Set up the simulated GPU and CUDA toolkit
+        uses: pantheongpu/setup-pantheonsim@ca87fe3143b29166822b923d6050945c5179408c # v0.1.5
+        with:
+          gpu: nvidia/h100
+          count: 4
+          cuda-toolkit: "13.0"
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ccache ninja-build
+
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-gpu-sim-${{ github.sha }}
+          restore-keys: |
+            ccache-gpu-sim-
+
+      # The simulator runs PTX only (90-virtual) and needs a shared CUDA runtime.
+      # BLT picks the static runtime unless CUDA_USE_STATIC_CUDA_RUNTIME is Off.
+      # Four simulated devices are used because the replay test compares
+      # against a reference log recorded on a four-GPU node.
+      - name: Configure project
+        run: |
+          cmake -B build -S . -GNinja \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DUMPIRE_ENABLE_DEVELOPER_DEFAULTS=On \
+                -DCMAKE_CXX_COMPILER=g++ \
+                -DENABLE_CUDA=On \
+                -DCMAKE_CUDA_COMPILER=/usr/local/cuda-13.0/bin/nvcc \
+                -DCUDAToolkit_ROOT=/usr/local/cuda-13.0 \
+                -DCMAKE_CUDA_ARCHITECTURES=90-virtual \
+                -DCMAKE_CUDA_RUNTIME_LIBRARY=Shared \
+                -DCUDA_USE_STATIC_CUDA_RUNTIME=Off \
+                -DCMAKE_CUDA_COMPILER_LAUNCHER=ccache \
+                -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+                -DENABLE_BENCHMARKS=Off \
+                -DENABLE_EXAMPLES=Off \
+                -DENABLE_FORTRAN=Off \
+                -DENABLE_MPI=Off
+
+      - name: Build project
+        run: |
+          ccache -z
+          cmake --build build -j3
+          ccache -s
+
+      # resource_aware_pool_tests is excluded: its pending-chunk checks need a
+      # kernel to still be running when cudaEventQuery is called, and the
+      # simulator completes kernels at launch (pantheongpu/pantheonsim#523).
+      - name: Run tests
+        working-directory: build
+        run: vgpu run ctest --output-on-failure --timeout 600 -E resource_aware_pool_tests
