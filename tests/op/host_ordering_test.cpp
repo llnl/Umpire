@@ -62,14 +62,19 @@ struct DeferredResource : camp::resources::Host {
 
 } // namespace host_ordering_test
 
+// Specialize in camp::resources (not the inline v1 namespace): camp 2025.12
+// declares is_concrete_resource_impl directly in camp::resources, while later
+// versions declare it inside inline namespace v1 -- the enclosing namespace is
+// a valid specialization scope for both. is_concrete_event_impl (and the
+// concept gate on the Event constructor) only exist from camp 2026.07.0.
 namespace camp {
 namespace resources {
-inline namespace v1 {
-template <>
-struct is_concrete_event_impl<host_ordering_test::DeferredEvent> : std::true_type {};
 template <>
 struct is_concrete_resource_impl<host_ordering_test::DeferredResource> : std::true_type {};
-} // namespace v1
+#if CAMP_VERSION >= 2026007000
+template <>
+struct is_concrete_event_impl<host_ordering_test::DeferredEvent> : std::true_type {};
+#endif
 } // namespace resources
 } // namespace camp
 

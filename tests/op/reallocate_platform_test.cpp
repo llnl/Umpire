@@ -157,7 +157,8 @@ TEST_P(ReallocatePlatform, NullPointerUsesRequestedDevicePlatform)
   }
   rm.setDefaultAllocator(rm.getAllocator("HOST"));
   auto platform = device->getPlatform();
-  camp::resources::Resource ctx;
+  // Host{} placeholder: camp 2025.12 has no default Resource constructor.
+  camp::resources::Resource ctx{camp::resources::Host{}};
   switch (platform) {
 #if defined(UMPIRE_ENABLE_CUDA)
     case camp::resources::Platform::cuda:
