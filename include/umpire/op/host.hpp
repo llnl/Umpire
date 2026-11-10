@@ -39,7 +39,7 @@ struct copy<resource::host_platform, resource::host_platform> {
   {
     resource.get_event().wait();
     exec(src, dst, len);
-    return detail::make_completed_event(resource);
+    return detail::make_event_proxy(resource);
   }
 };
 
@@ -71,7 +71,7 @@ struct memset<resource::host_platform> {
   {
     resource.get_event().wait();
     exec(ptr, val, len);
-    return detail::make_completed_event(resource);
+    return detail::make_event_proxy(resource);
   }
 };
 
@@ -130,7 +130,7 @@ struct prefetch<resource::host_platform> {
                                                                      camp::resources::Resource& resource)
   {
     // No-op: CPU already has direct access to host memory
-    return detail::make_completed_event(resource);
+    return detail::make_event_proxy(resource);
   }
 };
 

@@ -320,6 +320,26 @@ TEST(Reallocate, HostReallocateAsync)
   allocator.deallocate(ptr);
 }
 
+TEST(Reallocate, HostReallocateAsyncToZero)
+{
+  auto& rm = umpire::ResourceManager::getInstance();
+  auto allocator = rm.getAllocator("HOST");
+
+  int* ptr = static_cast<int*>(allocator.allocate(1024));
+  int* old_ptr = ptr;
+
+  camp::resources::Resource host_ctx{camp::resources::Host{}};
+
+  auto event = umpire::reallocate(&ptr, 0, host_ctx);
+  static_cast<camp::resources::Event>(event).wait();
+
+  ASSERT_NE(ptr, nullptr);
+  ASSERT_NE(ptr, old_ptr);
+  ASSERT_EQ(rm.getSize(ptr), 0u);
+
+  allocator.deallocate(ptr);
+}
+
 #if defined(UMPIRE_ENABLE_CUDA)
 TEST(Reallocate, CudaReallocateAsync)
 {

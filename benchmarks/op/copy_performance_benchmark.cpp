@@ -5,8 +5,6 @@
 // SPDX-License-Identifier: (MIT)
 //////////////////////////////////////////////////////////////////////////////
 
-#include <cstring>
-
 #include "benchmark/benchmark.h"
 
 #include "umpire/ResourceManager.hpp"
@@ -95,8 +93,8 @@ static void BM_CompileTimeDispatch_Copy_Host_Host(benchmark::State& state) {
   void* src_ptr = src_allocator.allocate(size);
   void* dst_ptr = dst_allocator.allocate(size);
 
-  // Initialize source data
-  std::memset(src_ptr, 0xCC, size);
+  // Initialize source data on the source allocator's backend.
+  umpire::memset(src_ptr, 0xCC, size);
 
   for (auto _ : state) {
     // Compile-time dispatch - explicit platform specification
@@ -127,8 +125,8 @@ static void BM_CompileTimeDispatch_Copy_Host_Cuda(benchmark::State& state) {
   void* src_ptr = src_allocator.allocate(size);
   void* dst_ptr = dst_allocator.allocate(size);
 
-  // Initialize source data
-  std::memset(src_ptr, 0xDD, size);
+  // Initialize source data on the source allocator's backend.
+  umpire::memset(src_ptr, 0xDD, size);
 
   for (auto _ : state) {
     // Compile-time dispatch - explicit platform specification
@@ -224,8 +222,8 @@ static void BM_CompileTimeDispatch_Copy_Host_Hip(benchmark::State& state) {
   void* src_ptr = src_allocator.allocate(size);
   void* dst_ptr = dst_allocator.allocate(size);
 
-  // Initialize source data
-  std::memset(src_ptr, 0x11, size);
+  // Initialize source data on the source allocator's backend.
+  umpire::memset(src_ptr, 0x11, size);
 
   for (auto _ : state) {
     // Compile-time dispatch - explicit platform specification

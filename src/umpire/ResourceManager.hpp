@@ -28,10 +28,6 @@ namespace umpire {
 
 namespace op {
 class MemoryOperation;
-
-template <template <typename... T> class Op>
-struct op_caller;
-
 } // namespace op
 
 namespace strategy {
@@ -46,10 +42,6 @@ class AllocateNull;
  * \brief
  */
 class ResourceManager {
-  // Friend declarations for template operations
-  template <template <typename... T> class Op>
-  friend struct op::op_caller;
-
  public:
   /*!
    * \brief
@@ -278,9 +270,9 @@ class ResourceManager {
    *          the REVERSE of this method's (dst, src, size) order. A mechanical
    *          migration that does not swap the pointer arguments will compile
    *          cleanly but silently copy data in the wrong direction. In
-   *          addition, umpire::copy requires an explicit, non-zero size --
-   *          it does not auto-detect the size from the allocation the way
-   *          this method does when size == 0.
+   *          addition, umpire::copy always copies exactly the size given
+   *          (a size of 0 copies nothing) -- it does not auto-detect the
+   *          full allocation size the way this method does when size == 0.
    */
   [[deprecated("Use umpire::copy(src, dst, size) instead -- NOTE: argument order is REVERSED (src, dst) vs this method's (dst, src)")]]
   void copy(void* dst_ptr, void* src_ptr, std::size_t size = 0);
@@ -294,9 +286,10 @@ class ResourceManager {
    *          which is the REVERSE of this method's (dst, src, ctx, size)
    *          order. A mechanical migration that does not swap the pointer
    *          arguments will compile cleanly but silently copy data in the
-   *          wrong direction. In addition, umpire::copy requires an
-   *          explicit, non-zero size -- it does not auto-detect the size
-   *          from the allocation the way this method does when size == 0.
+   *          wrong direction. In addition, umpire::copy always copies
+   *          exactly the size given (a size of 0 copies nothing) -- it does
+   *          not auto-detect the full allocation size the way this method
+   *          does when size == 0.
    */
   [[deprecated("Use umpire::copy(src, dst, size, ctx) instead -- NOTE: argument order is REVERSED (src, dst) vs this method's (dst, src)")]]
   camp::resources::EventProxy<camp::resources::Resource> copy(void* dst_ptr, void* src_ptr,
@@ -455,10 +448,8 @@ class ResourceManager {
 
   void* reallocate_impl(void* current_ptr, std::size_t new_size, Allocator allocator, camp::resources::Resource& ctx);
 
- public:
   util::AllocationMap m_allocations;
 
- private:
   std::list<std::unique_ptr<strategy::AllocationStrategy>> m_allocators;
   std::vector<std::string> m_shared_allocator_names;
 
@@ -480,9 +471,6 @@ class ResourceManager {
   friend std::vector<util::AllocationRecord> get_allocator_records(Allocator);
   friend strategy::ZeroByteHandler;
   friend strategy::mixins::AllocateNull;
-
-  template <template <typename... T> class Op>
-  friend struct umpire::op::op_caller;
 };
 
 } // end namespace umpire

@@ -125,8 +125,13 @@ inline void copy_impl(T* src_ptr, T* dst_ptr, std::size_t count,
                         << static_cast<void*>(dst_ptr) << ", src_ptr = " << static_cast<void*>(src_ptr)
                         << ", length = " << size << ", src_id = " << src_device << ", dst_id = " << dst_device);
 
-  omp_target_memcpy(static_cast<void*>(dst_ptr), static_cast<const void*>(src_ptr), size, 0, 0, dst_device,
-                    src_device);
+  const int ret = omp_target_memcpy(static_cast<void*>(dst_ptr), static_cast<const void*>(src_ptr), size, 0, 0,
+                                    dst_device, src_device);
+  if (ret != 0) {
+    UMPIRE_ERROR(runtime_error, fmt::format("omp_target_memcpy failed with error code {} (src_id = {}, dst_id = {}, "
+                                            "length = {})",
+                                            ret, src_device, dst_device, size));
+  }
 }
 
 // Helper function for host-to-device copy operations
@@ -148,8 +153,13 @@ inline void host_to_device_copy_impl(T* src_ptr, T* dst_ptr, std::size_t count,
                         << static_cast<void*>(dst_ptr) << ", src_ptr = " << static_cast<const void*>(src_ptr)
                         << ", length = " << size << ", src_id = " << src_device << ", dst_id = " << dst_device);
 
-  omp_target_memcpy(static_cast<void*>(dst_ptr), static_cast<const void*>(src_ptr), size, 0, 0, dst_device,
-                    src_device);
+  const int ret = omp_target_memcpy(static_cast<void*>(dst_ptr), static_cast<const void*>(src_ptr), size, 0, 0,
+                                    dst_device, src_device);
+  if (ret != 0) {
+    UMPIRE_ERROR(runtime_error, fmt::format("omp_target_memcpy failed with error code {} (src_id = {}, dst_id = {}, "
+                                            "length = {})",
+                                            ret, src_device, dst_device, size));
+  }
 }
 
 // Helper function for device-to-host copy operations
@@ -172,8 +182,13 @@ inline void device_to_host_copy_impl(T* src_ptr, T* dst_ptr, std::size_t count,
                         << static_cast<void*>(dst_ptr) << ", src_ptr = " << static_cast<const void*>(src_ptr)
                         << ", length = " << size << ", src_id = " << src_device << ", dst_id = " << dst_device);
 
-  omp_target_memcpy(static_cast<void*>(dst_ptr), static_cast<const void*>(src_ptr), size, 0, 0, dst_device,
-                    src_device);
+  const int ret = omp_target_memcpy(static_cast<void*>(dst_ptr), static_cast<const void*>(src_ptr), size, 0, 0,
+                                    dst_device, src_device);
+  if (ret != 0) {
+    UMPIRE_ERROR(runtime_error, fmt::format("omp_target_memcpy failed with error code {} (src_id = {}, dst_id = {}, "
+                                            "length = {})",
+                                            ret, src_device, dst_device, size));
+  }
 }
 
 // IMPORTANT: OpenMP Target Async Limitations

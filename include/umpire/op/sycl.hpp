@@ -24,6 +24,7 @@
 #include <iostream>
 #include <memory>
 #include <sstream>
+#include <type_traits>
 
 namespace umpire {
 namespace op {
@@ -321,13 +322,31 @@ struct prefetch<resource::sycl_platform> {
 namespace detail {
 template <typename T>
 void device_memset_sycl(T* ptr, T value, std::size_t count, sycl::queue& queue);
-}
+
+/**
+ * @brief Element types for which device_memset_sycl is explicitly instantiated
+ *
+ * Must be kept in sync with the explicit instantiation list in
+ * src/umpire/op/sycl_device_memset.cpp.
+ */
+template <typename T>
+inline constexpr bool is_device_memset_type_v =
+    std::is_same_v<T, char> || std::is_same_v<T, signed char> || std::is_same_v<T, unsigned char> ||
+    std::is_same_v<T, short> || std::is_same_v<T, unsigned short> || std::is_same_v<T, int> ||
+    std::is_same_v<T, unsigned int> || std::is_same_v<T, long> || std::is_same_v<T, unsigned long> ||
+    std::is_same_v<T, long long> || std::is_same_v<T, unsigned long long> || std::is_same_v<T, float> ||
+    std::is_same_v<T, double> || std::is_same_v<T, bool>;
+} // namespace detail
 
 // device_memset specialization
 template<>
 struct device_memset<resource::sycl_platform> {
   template <typename T, typename V>
   static void exec(T* /*ptr*/, V /*val*/, std::size_t /*len*/) {
+    static_assert(detail::is_device_memset_type_v<T>,
+                  "umpire::device_memset (SYCL) supports only: char, signed char, unsigned char, short, "
+                  "unsigned short, int, unsigned int, long, unsigned long, long long, unsigned long long, "
+                  "float, double, bool");
     // SYCL device_memset requires a queue context to execute properly.
     // Without a resource parameter, we cannot determine which device/queue to use.
     // Use the async version with a Resource parameter instead.
@@ -347,6 +366,10 @@ struct device_memset<resource::sycl_platform> {
   template <typename T, typename V>
   static camp::resources::EventProxy<camp::resources::Resource> exec(
       T* ptr, V val, std::size_t len, camp::resources::Resource& res) {
+    static_assert(detail::is_device_memset_type_v<T>,
+                  "umpire::device_memset (SYCL) supports only: char, signed char, unsigned char, short, "
+                  "unsigned short, int, unsigned int, long, unsigned long, long long, unsigned long long, "
+                  "float, double, bool");
     detail::sycl_impl::wait_for_resource(res);
     if (ptr && len > 0) {
       sycl::queue& queue = detail::get_queue_for_ptr(ptr, res);

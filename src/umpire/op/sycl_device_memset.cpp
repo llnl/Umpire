@@ -29,7 +29,11 @@ void device_memset_sycl(T* ptr, T value, std::size_t count, sycl::queue& queue)
 }
 
 // Explicit template instantiations for common types
+//
+// Must be kept in sync with detail::is_device_memset_type_v in
+// include/umpire/op/sycl.hpp.
 template void device_memset_sycl<char>(char*, char, std::size_t, sycl::queue&);
+template void device_memset_sycl<signed char>(signed char*, signed char, std::size_t, sycl::queue&);
 template void device_memset_sycl<unsigned char>(unsigned char*, unsigned char, std::size_t, sycl::queue&);
 template void device_memset_sycl<short>(short*, short, std::size_t, sycl::queue&);
 template void device_memset_sycl<unsigned short>(unsigned short*, unsigned short, std::size_t, sycl::queue&);
@@ -41,6 +45,7 @@ template void device_memset_sycl<long long>(long long*, long long, std::size_t, 
 template void device_memset_sycl<unsigned long long>(unsigned long long*, unsigned long long, std::size_t, sycl::queue&);
 template void device_memset_sycl<float>(float*, float, std::size_t, sycl::queue&);
 template void device_memset_sycl<double>(double*, double, std::size_t, sycl::queue&);
+template void device_memset_sycl<bool>(bool*, bool, std::size_t, sycl::queue&);
 
 } // namespace detail
 } // namespace op

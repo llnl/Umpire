@@ -203,13 +203,7 @@ struct op_caller {
 
     std::size_t available_bytes = record->size - static_cast<std::size_t>(offset);
 
-    std::size_t requested_bytes = length;
-    if constexpr (!std::is_same_v<T, void>) {
-      if (length > (std::numeric_limits<std::size_t>::max() / sizeof(T))) {
-        UMPIRE_ERROR(runtime_error, "Requested memset size overflow");
-      }
-      requested_bytes = length * sizeof(T);
-    }
+    std::size_t requested_bytes = detail::get_size<T>(length);
 
     if (requested_bytes > 0 && requested_bytes > available_bytes) {
       UMPIRE_ERROR(runtime_error,
@@ -234,13 +228,7 @@ struct op_caller {
     }
     std::size_t dst_available_bytes = dst_record->size - static_cast<std::size_t>(dst_offset);
 
-    std::size_t requested_bytes = size;
-    if constexpr (!std::is_same_v<T, void>) {
-      if (size > (std::numeric_limits<std::size_t>::max() / sizeof(T))) {
-        UMPIRE_ERROR(runtime_error, "Requested copy size overflow");
-      }
-      requested_bytes = size * sizeof(T);
-    }
+    std::size_t requested_bytes = detail::get_size<T>(size);
 
     if (requested_bytes == 0) {
       return;
@@ -285,8 +273,7 @@ struct op_caller {
   inline static auto exec(T* src, Args... args)
   {
     auto& rm = ResourceManager::getInstance();
-    auto& allocation_map = rm.m_allocations;
-    auto src_record = allocation_map.find(get_lookup_ptr(src));
+    auto src_record = rm.findAllocationRecord(get_lookup_ptr(src));
     auto p = src_record->strategy->getPlatform();
 
     if constexpr (is_memset_op()) {
@@ -303,8 +290,7 @@ struct op_caller {
   inline static auto exec(T* src, Args... args, camp::resources::Resource& ctx)
   {
     auto& rm = ResourceManager::getInstance();
-    auto& allocation_map = rm.m_allocations;
-    auto src_record = allocation_map.find(get_lookup_ptr(src));
+    auto src_record = rm.findAllocationRecord(get_lookup_ptr(src));
     auto p = src_record->strategy->getPlatform();
 
     if constexpr (is_memset_op()) {
@@ -321,9 +307,8 @@ struct op_caller {
   inline static auto exec(T* src, T* dst, Args... args)
   {
     auto& rm = ResourceManager::getInstance();
-    auto& allocation_map = rm.m_allocations;
-    auto src_record = allocation_map.find(src);
-    auto dst_record = allocation_map.find(dst);
+    auto src_record = rm.findAllocationRecord(src);
+    auto dst_record = rm.findAllocationRecord(dst);
 
     auto p1 = src_record->strategy->getPlatform();
     auto p2 = dst_record->strategy->getPlatform();
@@ -343,9 +328,8 @@ struct op_caller {
   inline static auto exec(T* src, T* dst, Args... args, camp::resources::Resource& ctx)
   {
     auto& rm = ResourceManager::getInstance();
-    auto& allocation_map = rm.m_allocations;
-    auto src_record = allocation_map.find(src);
-    auto dst_record = allocation_map.find(dst);
+    auto src_record = rm.findAllocationRecord(src);
+    auto dst_record = rm.findAllocationRecord(dst);
 
     auto p1 = src_record->strategy->getPlatform();
     auto p2 = dst_record->strategy->getPlatform();
@@ -657,10 +641,9 @@ PtrType* op::reallocate<Platform>::reallocate_impl_sync(PtrType** ptr_ptr, std::
   }
 
   auto& rm = ResourceManager::getInstance();
-  auto& allocation_map = rm.m_allocations;
   Allocator allocator = rm.getAllocator(current_ptr);
 
-  auto alloc_record = allocation_map.find(current_ptr);
+  auto alloc_record = rm.findAllocationRecord(current_ptr);
   if (current_ptr != alloc_record->ptr) {
     UMPIRE_ERROR(runtime_error, fmt::format("Cannot reallocate an offset ptr (ptr={}, base={})",
                                             reinterpret_cast<void*>(current_ptr), alloc_record->ptr));
@@ -670,8 +653,10 @@ PtrType* op::reallocate<Platform>::reallocate_impl_sync(PtrType** ptr_ptr, std::
   std::size_t new_bytes = detail::get_size<PtrType>(new_size);
 
   if (new_bytes == 0) {
-    allocator.deallocate(current_ptr);
+    // Allocate the replacement before freeing the old buffer so that a
+    // throwing allocate(0) leaves *ptr_ptr and the old buffer valid.
     PtrType* new_ptr = static_cast<PtrType*>(allocator.allocate(0));
+    allocator.deallocate(current_ptr);
     *ptr_ptr = new_ptr;
     return new_ptr;
   }
@@ -715,10 +700,9 @@ camp::resources::EventProxy<camp::resources::Resource> op::reallocate<Platform>:
   }
 
   auto& rm = ResourceManager::getInstance();
-  auto& allocation_map = rm.m_allocations;
   Allocator allocator = rm.getAllocator(current_ptr);
 
-  auto alloc_record = allocation_map.find(current_ptr);
+  auto alloc_record = rm.findAllocationRecord(current_ptr);
   if (current_ptr != alloc_record->ptr) {
     UMPIRE_ERROR(runtime_error, fmt::format("Cannot reallocate an offset ptr (ptr={}, base={})",
                                             reinterpret_cast<void*>(current_ptr), alloc_record->ptr));
@@ -728,8 +712,20 @@ camp::resources::EventProxy<camp::resources::Resource> op::reallocate<Platform>:
   std::size_t new_bytes = detail::get_size<PtrType>(new_size);
 
   if (new_bytes == 0) {
-    allocator.deallocate(current_ptr);
+    // Allocate the replacement before freeing the old buffer so that a
+    // throwing allocate(0) leaves *ptr_ptr and the old buffer valid.
     PtrType* new_ptr = static_cast<PtrType*>(allocator.allocate(0));
+    auto new_cleanup = detail::make_scope_exit([&]() {
+      allocator.deallocate(new_ptr);
+    });
+
+    // deallocate is not stream-ordered, and work previously submitted on ctx
+    // may still be reading or writing current_ptr, so wait for it to finish
+    // before freeing the old buffer.
+    ctx.get_event().wait();
+
+    allocator.deallocate(current_ptr);
+    new_cleanup.dismiss();
     *ptr_ptr = new_ptr;
     return camp::resources::EventProxy<camp::resources::Resource>{ctx};
   }
@@ -975,7 +971,7 @@ void copy(camp::resources::Platform src_platform, camp::resources::Platform dst_
  * @param dst_platform Platform where destination memory resides
  * @param src Source pointer
  * @param dst Destination pointer
- * @param len Number of elements to copy
+ * @param len Number of elements to copy (bytes if T is void)
  * @param ctx Resource context providing stream/queue for async execution
  *
  * @return EventProxy that can be waited on for completion
@@ -1015,6 +1011,10 @@ auto copy(camp::resources::Platform src_platform, camp::resources::Platform dst_
  * **Behavior**: Sets each byte to (value & 0xFF). For typed pointers, operates
  * on len*sizeof(T) bytes.
  *
+ * **memset vs device_memset**: memset always repeats a single BYTE pattern
+ * (C memset semantics), even though len counts elements for typed T. Use
+ * device_memset to assign typed VALUES element-wise.
+ *
  * **Thread Safety**: Safe to call from multiple threads on different pointers.
  */
 template <typename T, typename V>
@@ -1030,7 +1030,7 @@ void memset(camp::resources::Platform platform, T* ptr, V value, std::size_t len
  * @param platform Platform where memory resides
  * @param ptr Pointer to memory region
  * @param value Byte value to set
- * @param len Number of elements
+ * @param len Number of elements (bytes if T is void)
  * @param ctx Resource context for async execution
  *
  * @return EventProxy for completion synchronization
@@ -1231,7 +1231,7 @@ inline camp::resources::EventProxy<camp::resources::Resource> reallocate(camp::r
  * @param platform Platform where memory currently resides
  * @param ptr Pointer to memory to prefetch (must be managed/unified memory)
  * @param device Target device ID for prefetch
- * @param size Number of bytes to prefetch
+ * @param size Number of elements (bytes if T is void)
  *
  * **Platform Support**:
  * - CUDA: Uses cudaMemPrefetchAsync, requires managed memory capability
@@ -1257,7 +1257,7 @@ void prefetch(camp::resources::Platform platform, T* ptr, int device, std::size_
  * @param platform Platform where memory resides
  * @param ptr Pointer to prefetch
  * @param device Target device ID
- * @param size Number of bytes
+ * @param size Number of elements (bytes if T is void)
  * @param ctx Resource context for async execution
  *
  * @return EventProxy for completion synchronization
@@ -1282,7 +1282,7 @@ camp::resources::EventProxy<camp::resources::Resource> prefetch(camp::resources:
  * @param platform Platform where memory resides (cuda or hip only)
  * @param ptr Pointer to memory
  * @param device Device ID that will access the memory
- * @param size Number of bytes
+ * @param size Number of elements (bytes if T is void)
  *
  * **Support**: CUDA and HIP only. Throws runtime_error on other platforms.
  */
@@ -1301,7 +1301,7 @@ void set_accessed_by(camp::resources::Platform platform, T* ptr, int device, std
  * @param platform Platform where memory resides (cuda or hip only)
  * @param ptr Pointer to memory
  * @param device Preferred device ID
- * @param size Number of bytes
+ * @param size Number of elements (bytes if T is void)
  *
  * **Support**: CUDA and HIP only. Throws runtime_error on other platforms.
  */
@@ -1321,7 +1321,7 @@ void set_preferred_location(camp::resources::Platform platform, T* ptr, int devi
  * @param platform Platform where memory resides (cuda or hip only)
  * @param ptr Pointer to memory
  * @param device Device ID
- * @param size Number of bytes
+ * @param size Number of elements (bytes if T is void)
  *
  * **Support**: CUDA and HIP only. Throws runtime_error on other platforms.
  */
@@ -1340,7 +1340,7 @@ void set_read_mostly(camp::resources::Platform platform, T* ptr, int device, std
  * @param platform Platform where memory resides (cuda or hip only)
  * @param ptr Pointer to memory
  * @param device Device ID
- * @param size Number of bytes
+ * @param size Number of elements (bytes if T is void)
  *
  * **Support**: CUDA and HIP only. Throws runtime_error on other platforms.
  */
@@ -1359,7 +1359,7 @@ void unset_accessed_by(camp::resources::Platform platform, T* ptr, int device, s
  * @param platform Platform where memory resides (cuda or hip only)
  * @param ptr Pointer to memory
  * @param device Device ID
- * @param size Number of bytes
+ * @param size Number of elements (bytes if T is void)
  *
  * **Support**: CUDA and HIP only. Throws runtime_error on other platforms.
  */
@@ -1378,7 +1378,7 @@ void unset_preferred_location(camp::resources::Platform platform, T* ptr, int de
  * @param platform Platform where memory resides (cuda or hip only)
  * @param ptr Pointer to memory
  * @param device Device ID
- * @param size Number of bytes
+ * @param size Number of elements (bytes if T is void)
  *
  * **Support**: CUDA and HIP only. Throws runtime_error on other platforms.
  */
@@ -1399,7 +1399,7 @@ void unset_read_mostly(camp::resources::Platform platform, T* ptr, int device, s
  * @param platform Platform where memory resides (hip only)
  * @param ptr Pointer to memory
  * @param device Device ID
- * @param size Number of bytes
+ * @param size Number of elements (bytes if T is void)
  *
  * **Support**: HIP 5.0+ only. Available only when UMPIRE_ENABLE_HIP is defined
  * and HIP_VERSION_MAJOR >= 5.
@@ -1419,7 +1419,7 @@ void set_coarse_grain(camp::resources::Platform platform, T* ptr, int device, st
  * @param platform Platform where memory resides (hip only)
  * @param ptr Pointer to memory
  * @param device Device ID
- * @param size Number of bytes
+ * @param size Number of elements (bytes if T is void)
  *
  * **Support**: HIP 5.0+ only. Available only when UMPIRE_ENABLE_HIP is defined
  * and HIP_VERSION_MAJOR >= 5.

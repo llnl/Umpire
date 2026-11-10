@@ -23,9 +23,6 @@ if (UMPIRE_ENABLE_NUMA)
     NAME recipe_move_between_numa
     SOURCES recipe_move_between_numa.cpp
     DEPENDS_ON ${cookbook_depends})
-  blt_add_target_compile_flags(
-    TO recipe_move_between_numa
-    FLAGS ${UMPIRE_DISABLE_DEPRECATED_WARNINGS_FLAG})
   list(APPEND umpire_cookbooks recipe_move_between_numa)
 endif ()
 
@@ -82,9 +79,6 @@ if (UMPIRE_ENABLE_CUDA)
     NAME recipe_move_to_managed
     SOURCES recipe_move_to_managed.cpp
     DEPENDS_ON ${cookbook_depends})
-  blt_add_target_compile_flags(
-    TO recipe_move_to_managed
-    FLAGS ${UMPIRE_DISABLE_DEPRECATED_WARNINGS_FLAG})
   list(APPEND umpire_cookbooks recipe_move_to_managed)
 
   blt_add_executable(

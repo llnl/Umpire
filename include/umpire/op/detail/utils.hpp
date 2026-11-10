@@ -13,7 +13,7 @@ namespace detail {
 /**
  * @brief Calculate size in bytes based on element count and type
  *
- * @tparam T The pointer type (void* or typed pointer)
+ * @tparam T The element type (e.g. float, or void for raw bytes)
  * @param count Number of elements or bytes (if T is void)
  * @return std::size_t Size in bytes
  */
@@ -33,29 +33,18 @@ inline std::size_t get_size(std::size_t count)
 }
 
 /**
- * @brief Create a default event for platforms without native async support
- * 
- * @param resource The resource to create the event for
- * @return camp::resources::EventProxy<camp::resources::Resource> A completed event
+ * @brief Wrap a resource in an EventProxy
+ *
+ * Nothing is recorded at construction; camp produces the event lazily when the
+ * proxy is converted to an Event (or waited on).
+ *
+ * @param resource The resource whose event the proxy will produce
+ * @return camp::resources::EventProxy<camp::resources::Resource> Proxy for the resource
  */
 inline camp::resources::EventProxy<camp::resources::Resource> 
-make_completed_event(camp::resources::Resource& resource) noexcept
+make_event_proxy(camp::resources::Resource& resource) noexcept
 {
   return camp::resources::EventProxy<camp::resources::Resource>{resource};
-}
-
-/**
- * @brief Get minimum of two values (used for copy size calculations)
- * 
- * @tparam T The type of values being compared
- * @param a First value
- * @param b Second value
- * @return constexpr T The smaller of the two values
- */
-template <typename T>
-constexpr T min(const T& a, const T& b) noexcept
-{
-  return (a < b) ? a : b;
 }
 
 } // namespace detail
