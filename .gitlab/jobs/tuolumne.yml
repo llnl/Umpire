@@ -36,6 +36,13 @@ cce_21_0_0:
 # ${PROJECT_<MACHINE>_DEPS} in the extra jobs. There is not reason not to fully
 # describe the spec here.
 
+# Keep C/C++ on GCC while using LLVM-AMDGPU only for HIP.
+# Disable Fortran to isolate mixed C/C++ and HIP compiler support.
+gcc_13_3_1_rocmcc_6_4_3_hip:
+  variables:
+    SPEC: "~shared ~fortran +rocm +device_alloc tests=basic amdgpu_target=gfx942 %c,cxx=gcc@=13.3.1 %hip-lang=llvm-amdgpu@=6.4.3 ^hip@6.4.3"
+  extends: .job_on_tuolumne
+
 ###
 # This job intentionally tests our umpire package.py because although this job does not
 # explicitly have the ~tools, the package.py should still prevent tools from being built.
