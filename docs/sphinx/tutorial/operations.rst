@@ -69,7 +69,7 @@ Allocator.
 Memset
 ------
 
-Setting a whole block of memory to a value (like 0) is a common operation, that
+Setting a whole block of memory to a value (like 0) is a common operation that
 most people know as a memset. Umpire provides an ``umpire::memset`` function
 that can be applied to any allocation, regardless of where it came from. As
 with ``std::memset``, each byte is set to the given value; the length is the

@@ -8,10 +8,8 @@ Umpire's memory pools provide a more performant way to allocate large
 amounts of memory with fewer calls to the underlying API. 
 Memory pools allocate and manage a pool of large memory blocks.  When application
 allocations are requested, the memory pool allocator will service the allocation from
-these memory blocks rather than making (many) allocation requests of the underlying API
-which can ...
-at once instead of making multiple, smaller memory allocations which can 
-become quite expensive. However, the performance of memory pools 
+these memory blocks rather than making (many) allocation requests of the underlying API,
+which can become quite expensive. However, the performance of memory pools
 varies widely depending upon how the memory blocks within the pool are managed.
 Each application allocation within a memory pool must fit within a `memory block`.
 As memory is allocated and deallocated, those blocks must be properly 

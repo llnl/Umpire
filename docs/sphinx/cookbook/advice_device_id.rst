@@ -7,7 +7,7 @@ Apply Memory Advice with a Specific Device ID
 When using unified memory on systems with CUDA GPUs, various types of memory
 advice can be applied to modify how the CUDA runtime moves this memory around
 between the CPU and GPU. When applying memory advice, a device ID can be used
-to specific which device the advice relates to.  One type of advice that can be
+to specify which device the advice relates to.  One type of advice that can be
 applied is "preferred location", and you can specificy where you want the
 preferred location of the memory to be. This can be useful for ensuring that
 the memory is kept on the GPU. 
