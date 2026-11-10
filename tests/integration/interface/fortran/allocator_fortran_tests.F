@@ -1399,6 +1399,7 @@ end module umpire_fortran_generated_tests
 
 
 program fortran_test
+  use fruit
   use umpire_fortran_generated_tests
 
   implicit none

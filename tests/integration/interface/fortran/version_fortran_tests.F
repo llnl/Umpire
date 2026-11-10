@@ -32,6 +32,7 @@ module umpire_fortran_version_tests
 end module umpire_fortran_version_tests
 
 program fortran_test
+  use fruit
   use umpire_fortran_version_tests
 
   implicit none
