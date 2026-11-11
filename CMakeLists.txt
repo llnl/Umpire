@@ -178,7 +178,6 @@ include(cmake/SetupCompilerFlags.cmake)
 include(cmake/SetupUmpireThirdParty.cmake)
 
 add_subdirectory(src)
-add_subdirectory(include)
 
 configure_package_config_file(
   "${PROJECT_SOURCE_DIR}/umpire-config.cmake.in"

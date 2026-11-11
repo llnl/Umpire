@@ -230,3 +230,14 @@ install(DIRECTORY
   PATTERN "*.inl")
 
 umpire_add_code_checks(PREFIX umpire)
+
+if ("${PROJECT_SOURCE_DIR}" STREQUAL "${CMAKE_SOURCE_DIR}")
+  file(GLOB_RECURSE umpire_public_headers
+    "${PROJECT_SOURCE_DIR}/include/umpire/*.hpp"
+    "${PROJECT_SOURCE_DIR}/include/umpire/*.h"
+    "${PROJECT_SOURCE_DIR}/include/umpire/*.inl")
+  blt_add_code_checks(
+    PREFIX umpire_headers
+    SOURCES ${umpire_public_headers}
+    CLANGFORMAT_CFG_FILE ${PROJECT_SOURCE_DIR}/.clang-format)
+endif()
