@@ -1,12 +1,10 @@
 //////////////////////////////////////////////////////////////////////////////
-// Copyright (c) 2016-25, Lawrence Livermore National Security, LLC and Umpire
+// Copyright (c) 2016-26, Lawrence Livermore National Security, LLC and Umpire
 // project contributors. See the COPYRIGHT file for details.
 //
 // SPDX-License-Identifier: (MIT)
 //////////////////////////////////////////////////////////////////////////////
-#include <algorithm>
 #include <cstring>
-#include <random>
 
 #include "gtest/gtest.h"
 #include "umpire/Allocator.hpp"
@@ -35,31 +33,6 @@ TEST(Advise, HostAdviseThrows)
   unsigned char* byte_ptr = static_cast<unsigned char*>(ptr);
   for (std::size_t i = 0; i < size; ++i) {
     ASSERT_EQ(byte_ptr[i], 0x33) << "Host advise modified data at byte " << i;
-  }
-
-  allocator.deallocate(ptr);
-}
-
-TEST(Advise, HostAdviseExplicit)
-{
-  constexpr std::size_t size = 1024;
-
-  auto& rm = umpire::ResourceManager::getInstance();
-  auto allocator = rm.getAllocator("HOST");
-
-  void* ptr = allocator.allocate(size);
-
-  std::memset(ptr, 0x66, size);
-
-  // Explicit host advise - should not compile due to SFINAE constraints
-  // These calls should fail at compile time:
-  // umpire::set_accessed_by<umpire::resource::host_platform>(ptr, 0, size);
-  // umpire::set_preferred_location<umpire::resource::host_platform>(ptr, 0, size);
-  // umpire::set_read_mostly<umpire::resource::host_platform>(ptr, 0, size);
-
-  unsigned char* byte_ptr = static_cast<unsigned char*>(ptr);
-  for (std::size_t i = 0; i < size; ++i) {
-    ASSERT_EQ(byte_ptr[i], 0x66) << "Explicit host advise modified data at byte " << i;
   }
 
   allocator.deallocate(ptr);

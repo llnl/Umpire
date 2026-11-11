@@ -1,12 +1,10 @@
 //////////////////////////////////////////////////////////////////////////////
-// Copyright (c) 2016-25, Lawrence Livermore National Security, LLC and Umpire
+// Copyright (c) 2016-26, Lawrence Livermore National Security, LLC and Umpire
 // project contributors. See the COPYRIGHT file for details.
 //
 // SPDX-License-Identifier: (MIT)
 //////////////////////////////////////////////////////////////////////////////
-#include <algorithm>
 #include <cstring>
-#include <random>
 
 #include "gtest/gtest.h"
 #include "umpire/Allocator.hpp"
@@ -268,8 +266,7 @@ TEST(Reallocate, TypedReallocateOddElements)
   ptr = umpire::reallocate(&ptr, final_elements);
 
   for (std::size_t i = 0; i < initial_elements; ++i) {
-    ASSERT_EQ(ptr[i], static_cast<long>(i * 1000 + 7))
-        << "Element " << i << " corrupted during reallocate";
+    ASSERT_EQ(ptr[i], static_cast<long>(i * 1000 + 7)) << "Element " << i << " corrupted during reallocate";
   }
 
   for (std::size_t i = initial_elements; i < final_elements; ++i) {

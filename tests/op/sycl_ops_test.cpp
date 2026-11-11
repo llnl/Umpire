@@ -1,23 +1,26 @@
 //////////////////////////////////////////////////////////////////////////////
-// Copyright (c) 2016-2024, Lawrence Livermore National Security, LLC and Umpire
+// Copyright (c) 2016-26, Lawrence Livermore National Security, LLC and Umpire
 // project contributors. See the COPYRIGHT file for details.
 //
 // SPDX-License-Identifier: (MIT)
 //////////////////////////////////////////////////////////////////////////////
 
+#include <cstring>
+#include <exception>
+#include <memory>
+#include <optional>
+#include <vector>
+
 #include "gtest/gtest.h"
 #include "umpire/ResourceManager.hpp"
 #include "umpire/op.hpp"
-
-#include <optional>
-#include <memory>
-#include <vector>
 
 #if defined(UMPIRE_ENABLE_SYCL)
 
 namespace {
 
-std::optional<umpire::Allocator> try_get_allocator(umpire::ResourceManager& rm, const char* name) {
+std::optional<umpire::Allocator> try_get_allocator(umpire::ResourceManager& rm, const char* name)
+{
   try {
     return rm.getAllocator(name);
   } catch (const std::exception&) {
@@ -31,7 +34,8 @@ std::optional<umpire::Allocator> try_get_allocator(umpire::ResourceManager& rm, 
 // Basic Copy Operations
 //
 
-TEST(SyclOps, DeviceToDeviceCopySync) {
+TEST(SyclOps, DeviceToDeviceCopySync)
+{
   auto& rm = umpire::ResourceManager::getInstance();
   auto sycl_alloc = try_get_allocator(rm, "DEVICE");
 
@@ -67,7 +71,8 @@ TEST(SyclOps, DeviceToDeviceCopySync) {
   rm.getAllocator("HOST").deallocate(verify_buf);
 }
 
-TEST(SyclOps, DeviceToDeviceCopyAsync) {
+TEST(SyclOps, DeviceToDeviceCopyAsync)
+{
   auto& rm = umpire::ResourceManager::getInstance();
   auto sycl_alloc = try_get_allocator(rm, "DEVICE");
 
@@ -89,7 +94,6 @@ TEST(SyclOps, DeviceToDeviceCopyAsync) {
 
   auto event = umpire::copy(src, dst, num_bytes, sycl_ctx);
 
-  // SYCL has true async support - must explicitly wait
   static_cast<camp::resources::Event>(event).wait();
 
   void* verify_buf = rm.getAllocator("HOST").allocate(num_bytes);
@@ -108,7 +112,8 @@ TEST(SyclOps, DeviceToDeviceCopyAsync) {
   rm.getAllocator("HOST").deallocate(verify_buf);
 }
 
-TEST(SyclOps, HostToDeviceCopySync) {
+TEST(SyclOps, HostToDeviceCopySync)
+{
   auto& rm = umpire::ResourceManager::getInstance();
   auto sycl_alloc = try_get_allocator(rm, "DEVICE");
 
@@ -141,7 +146,8 @@ TEST(SyclOps, HostToDeviceCopySync) {
   rm.getAllocator("HOST").deallocate(host_verify);
 }
 
-TEST(SyclOps, HostToDeviceCopyAsync) {
+TEST(SyclOps, HostToDeviceCopyAsync)
+{
   auto& rm = umpire::ResourceManager::getInstance();
   auto sycl_alloc = try_get_allocator(rm, "DEVICE");
 
@@ -177,7 +183,8 @@ TEST(SyclOps, HostToDeviceCopyAsync) {
   rm.getAllocator("HOST").deallocate(host_verify);
 }
 
-TEST(SyclOps, DeviceToHostCopySync) {
+TEST(SyclOps, DeviceToHostCopySync)
+{
   auto& rm = umpire::ResourceManager::getInstance();
   auto sycl_alloc = try_get_allocator(rm, "DEVICE");
 
@@ -210,7 +217,8 @@ TEST(SyclOps, DeviceToHostCopySync) {
   rm.getAllocator("HOST").deallocate(host_temp);
 }
 
-TEST(SyclOps, DeviceToHostCopyAsync) {
+TEST(SyclOps, DeviceToHostCopyAsync)
+{
   auto& rm = umpire::ResourceManager::getInstance();
   auto sycl_alloc = try_get_allocator(rm, "DEVICE");
 
@@ -250,7 +258,8 @@ TEST(SyclOps, DeviceToHostCopyAsync) {
 // Memset Operations
 //
 
-TEST(SyclOps, MemsetSync) {
+TEST(SyclOps, MemsetSync)
+{
   auto& rm = umpire::ResourceManager::getInstance();
   auto sycl_alloc = try_get_allocator(rm, "DEVICE");
 
@@ -278,7 +287,8 @@ TEST(SyclOps, MemsetSync) {
   rm.getAllocator("HOST").deallocate(host_verify);
 }
 
-TEST(SyclOps, MemsetAsync) {
+TEST(SyclOps, MemsetAsync)
+{
   auto& rm = umpire::ResourceManager::getInstance();
   auto sycl_alloc = try_get_allocator(rm, "DEVICE");
 
@@ -313,7 +323,8 @@ TEST(SyclOps, MemsetAsync) {
 // Device Memset Operations (typed values)
 //
 
-TEST(SyclOps, DeviceMemsetTypedInt) {
+TEST(SyclOps, DeviceMemsetTypedInt)
+{
   auto& rm = umpire::ResourceManager::getInstance();
   auto sycl_alloc = try_get_allocator(rm, "DEVICE");
 
@@ -346,7 +357,8 @@ TEST(SyclOps, DeviceMemsetTypedInt) {
   rm.getAllocator("HOST").deallocate(host_verify);
 }
 
-TEST(SyclOps, DeviceMemsetTypedFloat) {
+TEST(SyclOps, DeviceMemsetTypedFloat)
+{
   auto& rm = umpire::ResourceManager::getInstance();
   auto sycl_alloc = try_get_allocator(rm, "DEVICE");
 
@@ -383,7 +395,8 @@ TEST(SyclOps, DeviceMemsetTypedFloat) {
 // Prefetch Operations
 //
 
-TEST(SyclOps, PrefetchSync) {
+TEST(SyclOps, PrefetchSync)
+{
   auto& rm = umpire::ResourceManager::getInstance();
   // Prefetch requires USM shared (managed) memory, so use the UM allocator.
   auto sycl_alloc = try_get_allocator(rm, "UM");
@@ -431,7 +444,8 @@ TEST(SyclOps, PrefetchSync) {
 // Edge Cases
 //
 
-TEST(SyclOps, ZeroSizeCopy) {
+TEST(SyclOps, ZeroSizeCopy)
+{
   auto& rm = umpire::ResourceManager::getInstance();
   auto sycl_alloc = try_get_allocator(rm, "DEVICE");
 
@@ -448,7 +462,8 @@ TEST(SyclOps, ZeroSizeCopy) {
   sycl_alloc->deallocate(dst);
 }
 
-TEST(SyclOps, ExplicitPlatformAPI) {
+TEST(SyclOps, ExplicitPlatformAPI)
+{
   auto& rm = umpire::ResourceManager::getInstance();
   auto sycl_alloc = try_get_allocator(rm, "DEVICE");
 
@@ -487,7 +502,8 @@ TEST(SyclOps, ExplicitPlatformAPI) {
   rm.getAllocator("HOST").deallocate(host_verify);
 }
 
-TEST(SyclOps, ExternalUSMCopyWithResource) {
+TEST(SyclOps, ExternalUSMCopyWithResource)
+{
   sycl::queue queue{sycl::property_list{sycl::property::queue::in_order{}}};
   if (!queue.get_device().has(sycl::aspect::usm_device_allocations)) {
     GTEST_SKIP() << "Device does not support USM device allocations";
@@ -515,15 +531,15 @@ TEST(SyclOps, ExternalUSMCopyWithResource) {
   EXPECT_EQ(output, input);
 }
 
-TEST(SyclOps, ExternalUSMMemsetWithResource) {
+TEST(SyclOps, ExternalUSMMemsetWithResource)
+{
   sycl::queue queue{sycl::property_list{sycl::property::queue::in_order{}}};
   if (!queue.get_device().has(sycl::aspect::usm_device_allocations)) {
     GTEST_SKIP() << "Device does not support USM device allocations";
   }
   constexpr std::size_t count = 32;
   auto free_usm = [&queue](unsigned char* ptr) { sycl::free(ptr, queue); };
-  std::unique_ptr<unsigned char, decltype(free_usm)> ptr(
-      sycl::malloc_device<unsigned char>(count, queue), free_usm);
+  std::unique_ptr<unsigned char, decltype(free_usm)> ptr(sycl::malloc_device<unsigned char>(count, queue), free_usm);
   ASSERT_NE(ptr.get(), nullptr);
   ASSERT_FALSE(umpire::ResourceManager::getInstance().hasAllocator(ptr.get()));
   camp::resources::Resource ctx{camp::resources::Sycl::SyclFromQueue(queue)};
@@ -534,7 +550,8 @@ TEST(SyclOps, ExternalUSMMemsetWithResource) {
   EXPECT_EQ(output, std::vector<unsigned char>(count, 0xAB));
 }
 
-TEST(SyclOps, ExternalPointersRequireResourceAndMatchingContext) {
+TEST(SyclOps, ExternalPointersRequireResourceAndMatchingContext)
+{
   int external[2] = {1, 2};
   int output[2] = {};
   using camp::resources::Platform;
@@ -554,11 +571,11 @@ TEST(SyclOps, ExternalPointersRequireResourceAndMatchingContext) {
                           sycl::property_list{sycl::property::queue::in_order{}});
   ASSERT_NE(queue.get_context(), other_queue.get_context());
   camp::resources::Resource other_ctx{camp::resources::Sycl::SyclFromQueue(other_queue)};
-  EXPECT_THROW(umpire::copy(Platform::sycl, Platform::host, ptr.get(), output, 2, other_ctx),
-               umpire::resource_error);
+  EXPECT_THROW(umpire::copy(Platform::sycl, Platform::host, ptr.get(), output, 2, other_ctx), umpire::resource_error);
 }
 
-TEST(SyclOps, TrackedAllocationKeepsItsContextWithDifferentResource) {
+TEST(SyclOps, TrackedAllocationKeepsItsContextWithDifferentResource)
+{
   auto& rm = umpire::ResourceManager::getInstance();
   auto allocator = try_get_allocator(rm, "DEVICE");
   if (!allocator || allocator->getAllocationStrategy()->getPlatform() != umpire::Platform::sycl) {
@@ -566,8 +583,8 @@ TEST(SyclOps, TrackedAllocationKeepsItsContextWithDifferentResource) {
   }
   constexpr std::size_t count = 32;
   auto deallocate = [&allocator](unsigned char* ptr) { allocator->deallocate(ptr); };
-  std::unique_ptr<unsigned char, decltype(deallocate)> ptr(
-      static_cast<unsigned char*>(allocator->allocate(count)), deallocate);
+  std::unique_ptr<unsigned char, decltype(deallocate)> ptr(static_cast<unsigned char*>(allocator->allocate(count)),
+                                                           deallocate);
   auto& allocation_queue = umpire::op::detail::get_queue_for_ptr(ptr.get());
   sycl::queue other_queue(sycl::context(allocation_queue.get_device()), allocation_queue.get_device(),
                           sycl::property_list{sycl::property::queue::in_order{}});

@@ -10,7 +10,7 @@ else
 	DebugArgs=
 endif
 
-targets = gcc clang umap_build asan cuda hip sycl intel 
+targets = gcc clang umap_build asan cuda hip sycl intel
 
 $(targets):
 	DOCKER_BUILDKIT=1 docker build --target $@ --no-cache $(DebugArgs) .

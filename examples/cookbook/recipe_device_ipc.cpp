@@ -10,9 +10,9 @@
 #include "umpire/Allocator.hpp"
 #include "umpire/ResourceManager.hpp"
 #include "umpire/Umpire.hpp"
+#include "umpire/op.hpp"
 #include "umpire/strategy/DeviceIpcAllocator.hpp"
 #include "umpire/util/MemoryResourceTraits.hpp"
-#include "umpire/op.hpp"
 #if defined(UMPIRE_ENABLE_MPI)
 #include <mpi.h>
 #endif

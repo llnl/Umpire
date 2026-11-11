@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////////////////////////////////
-// Copyright (c) 2016-25, Lawrence Livermore National Security, LLC and Umpire
+// Copyright (c) 2016-26, Lawrence Livermore National Security, LLC and Umpire
 // project contributors. See the COPYRIGHT file for details.
 //
 // SPDX-License-Identifier: (MIT)
@@ -18,9 +18,7 @@ void device_memset_sycl(T* ptr, T value, std::size_t count, sycl::queue& queue)
   }
 
   // Launch parallel kernel
-  auto event = queue.parallel_for(sycl::range<1>(count), [=](sycl::id<1> idx) {
-    ptr[idx] = value;
-  });
+  auto event = queue.parallel_for(sycl::range<1>(count), [=](sycl::id<1> idx) { ptr[idx] = value; });
 
   // Wait for completion (synchronous operation), consistent with the
   // wait_and_throw()-based error handling used elsewhere in the new SYCL ops
@@ -42,7 +40,8 @@ template void device_memset_sycl<unsigned int>(unsigned int*, unsigned int, std:
 template void device_memset_sycl<long>(long*, long, std::size_t, sycl::queue&);
 template void device_memset_sycl<unsigned long>(unsigned long*, unsigned long, std::size_t, sycl::queue&);
 template void device_memset_sycl<long long>(long long*, long long, std::size_t, sycl::queue&);
-template void device_memset_sycl<unsigned long long>(unsigned long long*, unsigned long long, std::size_t, sycl::queue&);
+template void device_memset_sycl<unsigned long long>(unsigned long long*, unsigned long long, std::size_t,
+                                                     sycl::queue&);
 template void device_memset_sycl<float>(float*, float, std::size_t, sycl::queue&);
 template void device_memset_sycl<double>(double*, double, std::size_t, sycl::queue&);
 template void device_memset_sycl<bool>(bool*, bool, std::size_t, sycl::queue&);

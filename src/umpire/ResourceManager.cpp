@@ -1270,82 +1270,6 @@ void* ResourceManager::reallocate_impl(void* current_ptr, std::size_t new_size, 
 
 void* ResourceManager::move(void* src_ptr, Allocator allocator)
 {
-#if defined(UMPIRE_RM_USE_NEW_OPS)
-  UMPIRE_LOG(Debug, "(src_ptr=" << src_ptr << ", allocator=" << allocator.getName() << ")");
-
-  auto alloc_record = m_allocations.find(src_ptr);
-
-  // short-circuit if ptr was allocated by 'allocator'
-  if (alloc_record->strategy == allocator.getAllocationStrategy()) {
-    umpire::event::record([&](auto& event) {
-      event.name("move")
-          .category(event::category::operation)
-          .arg("ptr", src_ptr)
-          .arg("allocator_ref", (void*)allocator.getAllocationStrategy())
-          .tag("allocator_name", allocator.getName())
-          .tag("replay", "true");
-    });
-    return src_ptr;
-  }
-
-#if defined(UMPIRE_ENABLE_NUMA)
-  {
-    auto base_strategy = util::unwrap_allocator<strategy::AllocationStrategy>(allocator);
-
-    // If found, use op::NumaMoveOperation to move in-place (same address
-    // returned)
-    if (dynamic_cast<strategy::NumaPolicy*>(base_strategy)) {
-      auto& op_registry = op::MemoryOperationRegistry::getInstance();
-
-      auto src_alloc_record = m_allocations.find(src_ptr);
-
-      const std::size_t size{src_alloc_record->size};
-      util::AllocationRecord dst_alloc_record{nullptr, size, allocator.getAllocationStrategy()};
-
-      if (size > 0) {
-        auto op = op_registry.find("MOVE", src_alloc_record->strategy, dst_alloc_record.strategy);
-        void* ret{nullptr};
-        op->transform(src_ptr, &ret, src_alloc_record, &dst_alloc_record, size);
-        UMPIRE_ASSERT(ret == src_ptr);
-      }
-
-      umpire::event::record([&](auto& event) {
-        event.name("move")
-            .category(event::category::operation)
-            .arg("ptr", src_ptr)
-            .arg("allocator_ref", (void*)allocator.getAllocationStrategy())
-            .tag("allocator_name", allocator.getName())
-            .tag("replay", "true")
-            .arg("result", src_ptr);
-      });
-      return src_ptr;
-    }
-  }
-#endif
-
-  if (src_ptr != alloc_record->ptr) {
-    UMPIRE_ERROR(runtime_error, fmt::format("Cannot move an offset ptr (ptr={}, base={})", src_ptr, alloc_record->ptr));
-  }
-
-  std::size_t size = getSize(src_ptr);
-  void* dst_ptr = allocator.allocate(size);
-
-  op::op_caller<op::copy>::exec(src_ptr, dst_ptr, size);
-
-  deallocate(src_ptr);
-
-  umpire::event::record([&](auto& event) {
-    event.name("move")
-        .category(event::category::operation)
-        .arg("ptr", src_ptr)
-        .arg("allocator_ref", (void*)allocator.getAllocationStrategy())
-        .tag("allocator_name", allocator.getName())
-        .tag("replay", "true")
-        .arg("result", dst_ptr);
-  });
-
-  return dst_ptr;
-#else
   UMPIRE_LOG(Debug, "(src_ptr=" << src_ptr << ", allocator=" << allocator.getName() << ")");
 
   auto alloc_record = m_allocations.find(src_ptr);
@@ -1418,7 +1342,6 @@ void* ResourceManager::move(void* src_ptr, Allocator allocator)
   });
 
   return dst_ptr;
-#endif
 }
 
 camp::resources::EventProxy<camp::resources::Resource> ResourceManager::prefetch(void* ptr, int device,

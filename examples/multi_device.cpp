@@ -7,8 +7,8 @@
 #include <iostream>
 
 #include "umpire/ResourceManager.hpp"
-#include "umpire/strategy/QuickPool.hpp"
 #include "umpire/op.hpp"
+#include "umpire/strategy/QuickPool.hpp"
 
 constexpr int BLOCK_SIZE = 256;
 constexpr int NUM_THREADS = 4096;

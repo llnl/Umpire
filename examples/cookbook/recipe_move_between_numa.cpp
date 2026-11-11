@@ -8,11 +8,11 @@
 
 #include "umpire/Allocator.hpp"
 #include "umpire/ResourceManager.hpp"
+#include "umpire/op.hpp"
 #include "umpire/strategy/NumaPolicy.hpp"
 #include "umpire/util/Macros.hpp"
 #include "umpire/util/error.hpp"
 #include "umpire/util/numa.hpp"
-#include "umpire/op.hpp"
 
 #if defined(UMPIRE_ENABLE_CUDA)
 #include <cuda_runtime_api.h>

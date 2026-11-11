@@ -1,23 +1,26 @@
 //////////////////////////////////////////////////////////////////////////////
-// Copyright (c) 2016-2024, Lawrence Livermore National Security, LLC and Umpire
+// Copyright (c) 2016-26, Lawrence Livermore National Security, LLC and Umpire
 // project contributors. See the COPYRIGHT file for details.
 //
 // SPDX-License-Identifier: (MIT)
 //////////////////////////////////////////////////////////////////////////////
 
+#include <cstring>
+#include <exception>
+#include <memory>
+#include <optional>
+#include <vector>
+
 #include "gtest/gtest.h"
 #include "umpire/ResourceManager.hpp"
 #include "umpire/op.hpp"
-
-#include <optional>
-#include <memory>
-#include <vector>
 
 #if defined(UMPIRE_ENABLE_OPENMP_TARGET)
 
 namespace {
 
-std::optional<umpire::Allocator> try_get_allocator(umpire::ResourceManager& rm, const char* name) {
+std::optional<umpire::Allocator> try_get_allocator(umpire::ResourceManager& rm, const char* name)
+{
   try {
     return rm.getAllocator(name);
   } catch (const std::exception&) {
@@ -30,10 +33,10 @@ std::optional<umpire::Allocator> try_get_allocator(umpire::ResourceManager& rm, 
 //
 // Basic Copy Operations
 // NOTE: OpenMP Target async operations are currently synchronous
-// See include/umpire/op/openmp_target.hpp lines 64-80 for details
 //
 
-TEST(OpenMPTargetOps, DeviceToDeviceCopySync) {
+TEST(OpenMPTargetOps, DeviceToDeviceCopySync)
+{
   auto& rm = umpire::ResourceManager::getInstance();
   auto omp_alloc = try_get_allocator(rm, "DEVICE");
 
@@ -69,9 +72,9 @@ TEST(OpenMPTargetOps, DeviceToDeviceCopySync) {
   rm.getAllocator("HOST").deallocate(verify_buf);
 }
 
-TEST(OpenMPTargetOps, DeviceToDeviceCopyAsync) {
+TEST(OpenMPTargetOps, DeviceToDeviceCopyAsync)
+{
   // NOTE: OpenMP Target async operations are currently synchronous
-  // See include/umpire/op/openmp_target.hpp lines 64-80 for details
   // This test verifies API compatibility, not true async behavior
 
   auto& rm = umpire::ResourceManager::getInstance();
@@ -113,7 +116,8 @@ TEST(OpenMPTargetOps, DeviceToDeviceCopyAsync) {
   rm.getAllocator("HOST").deallocate(verify_buf);
 }
 
-TEST(OpenMPTargetOps, HostToDeviceCopySync) {
+TEST(OpenMPTargetOps, HostToDeviceCopySync)
+{
   auto& rm = umpire::ResourceManager::getInstance();
   auto omp_alloc = try_get_allocator(rm, "DEVICE");
 
@@ -146,9 +150,9 @@ TEST(OpenMPTargetOps, HostToDeviceCopySync) {
   rm.getAllocator("HOST").deallocate(host_verify);
 }
 
-TEST(OpenMPTargetOps, HostToDeviceCopyAsync) {
+TEST(OpenMPTargetOps, HostToDeviceCopyAsync)
+{
   // NOTE: OpenMP Target async operations are currently synchronous
-  // See include/umpire/op/openmp_target.hpp lines 64-80
 
   auto& rm = umpire::ResourceManager::getInstance();
   auto omp_alloc = try_get_allocator(rm, "DEVICE");
@@ -185,7 +189,8 @@ TEST(OpenMPTargetOps, HostToDeviceCopyAsync) {
   rm.getAllocator("HOST").deallocate(host_verify);
 }
 
-TEST(OpenMPTargetOps, DeviceToHostCopySync) {
+TEST(OpenMPTargetOps, DeviceToHostCopySync)
+{
   auto& rm = umpire::ResourceManager::getInstance();
   auto omp_alloc = try_get_allocator(rm, "DEVICE");
 
@@ -218,9 +223,9 @@ TEST(OpenMPTargetOps, DeviceToHostCopySync) {
   rm.getAllocator("HOST").deallocate(host_temp);
 }
 
-TEST(OpenMPTargetOps, DeviceToHostCopyAsync) {
+TEST(OpenMPTargetOps, DeviceToHostCopyAsync)
+{
   // NOTE: OpenMP Target async operations are currently synchronous
-  // See include/umpire/op/openmp_target.hpp lines 64-80
 
   auto& rm = umpire::ResourceManager::getInstance();
   auto omp_alloc = try_get_allocator(rm, "DEVICE");
@@ -261,7 +266,8 @@ TEST(OpenMPTargetOps, DeviceToHostCopyAsync) {
 // Memset Operations
 //
 
-TEST(OpenMPTargetOps, MemsetSync) {
+TEST(OpenMPTargetOps, MemsetSync)
+{
   auto& rm = umpire::ResourceManager::getInstance();
   auto omp_alloc = try_get_allocator(rm, "DEVICE");
 
@@ -289,9 +295,9 @@ TEST(OpenMPTargetOps, MemsetSync) {
   rm.getAllocator("HOST").deallocate(host_verify);
 }
 
-TEST(OpenMPTargetOps, MemsetAsync) {
+TEST(OpenMPTargetOps, MemsetAsync)
+{
   // NOTE: OpenMP Target async operations are currently synchronous
-  // See include/umpire/op/openmp_target.hpp lines 64-80
 
   auto& rm = umpire::ResourceManager::getInstance();
   auto omp_alloc = try_get_allocator(rm, "DEVICE");
@@ -327,7 +333,8 @@ TEST(OpenMPTargetOps, MemsetAsync) {
 // Device Memset Operations (typed values)
 //
 
-TEST(OpenMPTargetOps, DeviceMemsetTypedInt) {
+TEST(OpenMPTargetOps, DeviceMemsetTypedInt)
+{
   auto& rm = umpire::ResourceManager::getInstance();
   auto omp_alloc = try_get_allocator(rm, "DEVICE");
 
@@ -362,7 +369,8 @@ TEST(OpenMPTargetOps, DeviceMemsetTypedInt) {
 // Edge Cases
 //
 
-TEST(OpenMPTargetOps, ZeroSizeCopy) {
+TEST(OpenMPTargetOps, ZeroSizeCopy)
+{
   auto& rm = umpire::ResourceManager::getInstance();
   auto omp_alloc = try_get_allocator(rm, "DEVICE");
 
@@ -379,19 +387,9 @@ TEST(OpenMPTargetOps, ZeroSizeCopy) {
   omp_alloc->deallocate(dst);
 }
 
-TEST(OpenMPTargetOps, AsyncIsSynchronousDocumented) {
-  // This test explicitly documents the known limitation that
-  // OpenMP Target async operations are currently synchronous
-  // See include/umpire/op/openmp_target.hpp lines 64-80:
-  //
-  // "Note: CAMP's OpenMP resource event implementation currently
-  //  only supports synchronous events that complete immediately."
-  //
-  // This means:
-  // 1. Async API exists for compatibility
-  // 2. Operations execute synchronously
-  // 3. No performance benefit over sync operations
-  // 4. Event.wait() returns immediately
+TEST(OpenMPTargetOps, AsyncIsSynchronousDocumented)
+{
+  // The resource-taking copy currently completes synchronously.
 
   auto& rm = umpire::ResourceManager::getInstance();
   auto omp_alloc = try_get_allocator(rm, "DEVICE");
@@ -435,7 +433,8 @@ TEST(OpenMPTargetOps, AsyncIsSynchronousDocumented) {
   rm.getAllocator("HOST").deallocate(host_verify);
 }
 
-TEST(OpenMPTargetOps, ExternalTargetCopyWithResource) {
+TEST(OpenMPTargetOps, ExternalTargetCopyWithResource)
+{
   const int device = omp_get_num_devices() > 0 ? 0 : omp_get_initial_device();
   constexpr std::size_t count = 32;
   auto free_target = [device](int* ptr) { omp_target_free(ptr, device); };
@@ -455,15 +454,15 @@ TEST(OpenMPTargetOps, ExternalTargetCopyWithResource) {
 
   auto to_device = umpire::copy(Platform::host, Platform::omp_target, input.data(), src.get() + 1, count, ctx);
   static_cast<camp::resources::Event>(to_device).wait();
-  auto to_device2 = umpire::copy(Platform::omp_target, Platform::omp_target,
-                                src.get() + 1, dst.get() + 1, count, ctx);
+  auto to_device2 = umpire::copy(Platform::omp_target, Platform::omp_target, src.get() + 1, dst.get() + 1, count, ctx);
   static_cast<camp::resources::Event>(to_device2).wait();
   auto to_host = umpire::copy(Platform::omp_target, Platform::host, dst.get() + 1, output.data(), count, ctx);
   static_cast<camp::resources::Event>(to_host).wait();
   EXPECT_EQ(output, input);
 }
 
-TEST(OpenMPTargetOps, ExternalTargetMemsetWithResource) {
+TEST(OpenMPTargetOps, ExternalTargetMemsetWithResource)
+{
   const int device = omp_get_num_devices() > 0 ? 0 : omp_get_initial_device();
   constexpr std::size_t count = 32;
   auto free_target = [device](unsigned char* ptr) { omp_target_free(ptr, device); };
@@ -479,17 +478,18 @@ TEST(OpenMPTargetOps, ExternalTargetMemsetWithResource) {
   EXPECT_EQ(output, std::vector<unsigned char>(count, 0xAB));
 }
 
-TEST(OpenMPTargetOps, ExternalPointersRequireResource) {
+TEST(OpenMPTargetOps, ExternalPointersRequireResource)
+{
   int external[2] = {1, 2};
   int output[2] = {};
   using camp::resources::Platform;
-  EXPECT_THROW(umpire::copy(Platform::omp_target, Platform::host, external, output, 2),
-               umpire::resource_error);
+  EXPECT_THROW(umpire::copy(Platform::omp_target, Platform::host, external, output, 2), umpire::resource_error);
   EXPECT_THROW(umpire::memset(Platform::omp_target, external, 0, 2), umpire::resource_error);
   EXPECT_THROW(umpire::device_memset(Platform::omp_target, external, 0, 2), umpire::resource_error);
 }
 
-TEST(OpenMPTargetOps, TrackedDeviceOverridesResource) {
+TEST(OpenMPTargetOps, TrackedDeviceOverridesResource)
+{
   auto& rm = umpire::ResourceManager::getInstance();
   auto allocator = try_get_allocator(rm, "DEVICE");
   if (!allocator || allocator->getAllocationStrategy()->getPlatform() != umpire::Platform::omp_target) {
@@ -497,11 +497,10 @@ TEST(OpenMPTargetOps, TrackedDeviceOverridesResource) {
   }
   constexpr std::size_t count = 32;
   auto deallocate = [&allocator](unsigned char* ptr) { allocator->deallocate(ptr); };
-  std::unique_ptr<unsigned char, decltype(deallocate)> ptr(
-      static_cast<unsigned char*>(allocator->allocate(count)), deallocate);
+  std::unique_ptr<unsigned char, decltype(deallocate)> ptr(static_cast<unsigned char*>(allocator->allocate(count)),
+                                                           deallocate);
   camp::resources::Resource ctx{camp::resources::Omp(-1, omp_get_initial_device())};
-  EXPECT_EQ(umpire::op::detail::get_device_id(ptr.get(), &ctx),
-            allocator->getAllocationStrategy()->getTraits().id);
+  EXPECT_EQ(umpire::op::detail::get_device_id(ptr.get(), &ctx), allocator->getAllocationStrategy()->getTraits().id);
   using camp::resources::Platform;
   auto fill = umpire::memset(Platform::omp_target, ptr.get(), 0x55, count, ctx);
   static_cast<camp::resources::Event>(fill).wait();

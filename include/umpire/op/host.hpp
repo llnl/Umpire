@@ -1,3 +1,9 @@
+//////////////////////////////////////////////////////////////////////////////
+// Copyright (c) 2016-26, Lawrence Livermore National Security, LLC and Umpire
+// project contributors. See the COPYRIGHT file for details.
+//
+// SPDX-License-Identifier: (MIT)
+//////////////////////////////////////////////////////////////////////////////
 #pragma once
 
 #include <cstring>
@@ -39,7 +45,7 @@ struct copy<resource::host_platform, resource::host_platform> {
   {
     resource.get_event().wait();
     exec(src, dst, len);
-    return detail::make_event_proxy(resource);
+    return camp::resources::EventProxy<camp::resources::Resource>{resource};
   }
 };
 
@@ -71,7 +77,7 @@ struct memset<resource::host_platform> {
   {
     resource.get_event().wait();
     exec(ptr, val, len);
-    return detail::make_event_proxy(resource);
+    return camp::resources::EventProxy<camp::resources::Resource>{resource};
   }
 };
 
@@ -130,7 +136,7 @@ struct prefetch<resource::host_platform> {
                                                                      camp::resources::Resource& resource)
   {
     // No-op: CPU already has direct access to host memory
-    return detail::make_event_proxy(resource);
+    return camp::resources::EventProxy<camp::resources::Resource>{resource};
   }
 };
 

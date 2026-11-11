@@ -33,10 +33,6 @@ __host__ DeviceAllocator::DeviceAllocator(Allocator allocator, size_t size, cons
 
   // convert the string name to a char name
   const char* name = old_name.c_str();
-  // Must be explicitly ::memset: an unqualified call here resolves to the
-  // umpire::memset operation (visible via op.hpp), which requires an
-  // allocation-map-tracked pointer -- m_name is a member of a potentially
-  // stack-resident object.
   std::memset(m_name, '\0', old_name.length() + 1);
   int i = 0;
   do {

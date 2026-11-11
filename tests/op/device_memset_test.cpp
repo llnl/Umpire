@@ -1,14 +1,11 @@
 //////////////////////////////////////////////////////////////////////////////
-// Copyright (c) 2016-25, Lawrence Livermore National Security, LLC and Umpire
+// Copyright (c) 2016-26, Lawrence Livermore National Security, LLC and Umpire
 // project contributors. See the COPYRIGHT file for details.
 //
 // SPDX-License-Identifier: (MIT)
 //////////////////////////////////////////////////////////////////////////////
-#include <algorithm>
-#include <cstring>
 #include <exception>
 #include <optional>
-#include <random>
 
 #include "gtest/gtest.h"
 #include "umpire/Allocator.hpp"
@@ -164,8 +161,7 @@ TEST(DeviceMemset, DifferentValues)
     umpire::copy(device_ptr, host_ptr, num_elements);
 
     for (std::size_t i = 0; i < num_elements; ++i) {
-      ASSERT_EQ(host_ptr[i], test_value) << "Device memset failed for value " << test_value
-                                         << " at element " << i;
+      ASSERT_EQ(host_ptr[i], test_value) << "Device memset failed for value " << test_value << " at element " << i;
     }
   }
 

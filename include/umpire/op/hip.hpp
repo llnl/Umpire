@@ -1,6 +1,13 @@
+//////////////////////////////////////////////////////////////////////////////
+// Copyright (c) 2016-26, Lawrence Livermore National Security, LLC and Umpire
+// project contributors. See the COPYRIGHT file for details.
+//
+// SPDX-License-Identifier: (MIT)
+//////////////////////////////////////////////////////////////////////////////
 #pragma once
 
 #include <hip/hip_runtime.h>
+
 #include <type_traits>
 
 #include "umpire/op/detail/utils.hpp"
@@ -19,33 +26,6 @@ __global__ void umpire_device_memset_kernel(T* data, T value, std::size_t count)
 
 // HIP implementation helpers
 namespace detail {
-
-/**
- * @brief Get the HIP memory copy direction kind
- *
- * @tparam SRC Source platform
- * @tparam DST Destination platform
- */
-template <typename SRC, typename DST>
-struct copy_kind;
-
-// Device to host specialization
-template <>
-struct copy_kind<resource::hip_platform, resource::host_platform> {
-  static constexpr hipMemcpyKind value = hipMemcpyDeviceToHost;
-};
-
-// Host to device specialization
-template <>
-struct copy_kind<resource::host_platform, resource::hip_platform> {
-  static constexpr hipMemcpyKind value = hipMemcpyHostToDevice;
-};
-
-// Device to device specialization
-template <>
-struct copy_kind<resource::hip_platform, resource::hip_platform> {
-  static constexpr hipMemcpyKind value = hipMemcpyDeviceToDevice;
-};
 
 /**
  * @brief Check if a HIP device supports managed memory features
@@ -169,10 +149,10 @@ inline camp::resources::EventProxy<camp::resources::Resource> copy_async(T* src,
 
   hipError_t error = ::hipMemcpyAsync(dst, src, size, kind, stream);
   if (error != hipSuccess) {
-    UMPIRE_ERROR(runtime_error,
-                 fmt::format("hipMemcpyAsync(dst={}, src={}, size={}, kind={}, stream={}) failed with error: {}",
-                             fmt::ptr(dst), fmt::ptr(src), size, static_cast<int>(kind), static_cast<void*>(stream),
-                             hipGetErrorString(error)));
+    UMPIRE_ERROR(
+        runtime_error,
+        fmt::format("hipMemcpyAsync(dst={}, src={}, size={}, kind={}, stream={}) failed with error: {}", fmt::ptr(dst),
+                    fmt::ptr(src), size, static_cast<int>(kind), static_cast<void*>(stream), hipGetErrorString(error)));
   }
 
   return camp::resources::EventProxy<camp::resources::Resource>{resource};
@@ -288,8 +268,7 @@ inline void prefetch(T* ptr, int device, std::size_t count)
   hipError_t get_dev_err = hipGetDevice(&current_device);
 
   if (get_dev_err != hipSuccess) {
-    UMPIRE_ERROR(runtime_error,
-                 fmt::format("hipGetDevice failed with error: {}", hipGetErrorString(get_dev_err)));
+    UMPIRE_ERROR(runtime_error, fmt::format("hipGetDevice failed with error: {}", hipGetErrorString(get_dev_err)));
   }
 
   int gpu = (device != hipCpuDeviceId) ? device : current_device;
@@ -326,8 +305,7 @@ inline camp::resources::EventProxy<camp::resources::Resource> prefetch_async(T* 
   hipError_t get_dev_err = hipGetDevice(&current_device);
 
   if (get_dev_err != hipSuccess) {
-    UMPIRE_ERROR(runtime_error,
-                 fmt::format("hipGetDevice failed with error: {}", hipGetErrorString(get_dev_err)));
+    UMPIRE_ERROR(runtime_error, fmt::format("hipGetDevice failed with error: {}", hipGetErrorString(get_dev_err)));
   }
 
   int gpu = (device != hipCpuDeviceId) ? device : current_device;
@@ -366,7 +344,7 @@ struct copy<resource::hip_platform, resource::hip_platform> {
   template <typename T>
   static void exec(T* src, T* dst, std::size_t len)
   {
-    detail::copy(src, dst, len, detail::copy_kind<resource::hip_platform, resource::hip_platform>::value);
+    detail::copy(src, dst, len, hipMemcpyDeviceToDevice);
   }
 
   /**
@@ -383,8 +361,7 @@ struct copy<resource::hip_platform, resource::hip_platform> {
   static camp::resources::EventProxy<camp::resources::Resource> exec(T* src, T* dst, std::size_t len,
                                                                      camp::resources::Resource& resource)
   {
-    return detail::copy_async(src, dst, len, resource,
-                              detail::copy_kind<resource::hip_platform, resource::hip_platform>::value);
+    return detail::copy_async(src, dst, len, resource, hipMemcpyDeviceToDevice);
   }
 };
 
@@ -402,7 +379,7 @@ struct copy<resource::hip_platform, resource::host_platform> {
   template <typename T>
   static void exec(T* src, T* dst, std::size_t len)
   {
-    detail::copy(src, dst, len, detail::copy_kind<resource::hip_platform, resource::host_platform>::value);
+    detail::copy(src, dst, len, hipMemcpyDeviceToHost);
   }
 
   /**
@@ -419,8 +396,7 @@ struct copy<resource::hip_platform, resource::host_platform> {
   static camp::resources::EventProxy<camp::resources::Resource> exec(T* src, T* dst, std::size_t len,
                                                                      camp::resources::Resource& resource)
   {
-    return detail::copy_async(src, dst, len, resource,
-                              detail::copy_kind<resource::hip_platform, resource::host_platform>::value);
+    return detail::copy_async(src, dst, len, resource, hipMemcpyDeviceToHost);
   }
 };
 
@@ -438,7 +414,7 @@ struct copy<resource::host_platform, resource::hip_platform> {
   template <typename T>
   static void exec(T* src, T* dst, std::size_t len)
   {
-    detail::copy(src, dst, len, detail::copy_kind<resource::host_platform, resource::hip_platform>::value);
+    detail::copy(src, dst, len, hipMemcpyHostToDevice);
   }
 
   /**
@@ -455,8 +431,7 @@ struct copy<resource::host_platform, resource::hip_platform> {
   static camp::resources::EventProxy<camp::resources::Resource> exec(T* src, T* dst, std::size_t len,
                                                                      camp::resources::Resource& resource)
   {
-    return detail::copy_async(src, dst, len, resource,
-                              detail::copy_kind<resource::host_platform, resource::hip_platform>::value);
+    return detail::copy_async(src, dst, len, resource, hipMemcpyHostToDevice);
   }
 };
 
@@ -533,9 +508,6 @@ struct device_memset<resource::hip_platform> {
   }
 };
 
-// Note: HIP platform uses the generic reallocate implementation from operations.hpp
-// since direct HIP reallocation isn't supported and memory pools require a safe allocate-copy-free pattern
-
 // HIP prefetch operation
 template <>
 struct prefetch<resource::hip_platform> {
@@ -572,22 +544,22 @@ struct prefetch<resource::hip_platform> {
 };
 
 // Memory advice operations - using macro to reduce duplication
-#define DEFINE_HIP_ADVICE_OP(op_name, advice_flag)                        \
-  template <>                                                             \
-  struct op_name<resource::hip_platform> {                                \
-    /**                                                                   \
-     * @brief Apply memory advice operation                               \
-     *                                                                    \
-     * @tparam T Type of memory                                           \
-     * @param ptr Pointer to memory                                       \
-     * @param device Device to apply advice for                           \
-     * @param len Number of elements                                      \
-     */                                                                   \
-    template <typename T>                                                 \
-    static inline void exec(T* ptr, int device, std::size_t len)          \
-    {                                                                     \
-      detail::advise(ptr, len, device, advice_flag);                      \
-    }                                                                     \
+#define DEFINE_HIP_ADVICE_OP(op_name, advice_flag)               \
+  template <>                                                    \
+  struct op_name<resource::hip_platform> {                       \
+    /**                                                          \
+     * @brief Apply memory advice operation                      \
+     *                                                           \
+     * @tparam T Type of memory                                  \
+     * @param ptr Pointer to memory                              \
+     * @param device Device to apply advice for                  \
+     * @param len Number of elements                             \
+     */                                                          \
+    template <typename T>                                        \
+    static inline void exec(T* ptr, int device, std::size_t len) \
+    {                                                            \
+      detail::advise(ptr, len, device, advice_flag);             \
+    }                                                            \
   };
 
 DEFINE_HIP_ADVICE_OP(set_accessed_by, hipMemAdviseSetAccessedBy)

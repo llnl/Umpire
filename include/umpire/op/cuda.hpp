@@ -1,6 +1,13 @@
+//////////////////////////////////////////////////////////////////////////////
+// Copyright (c) 2016-26, Lawrence Livermore National Security, LLC and Umpire
+// project contributors. See the COPYRIGHT file for details.
+//
+// SPDX-License-Identifier: (MIT)
+//////////////////////////////////////////////////////////////////////////////
 #pragma once
 
 #include <cuda_runtime.h>
+
 #include <type_traits>
 
 #include "umpire/op/detail/utils.hpp"
@@ -52,33 +59,6 @@ void device_memset(T* ptr, T value, std::size_t count);
  */
 template <typename T>
 void device_memset(T* ptr, T value, std::size_t count, cudaStream_t stream, int device);
-
-/**
- * @brief Get the CUDA memory copy direction kind
- *
- * @tparam SRC Source platform
- * @tparam DST Destination platform
- */
-template <typename SRC, typename DST>
-struct copy_kind;
-
-// Device to host specialization
-template <>
-struct copy_kind<resource::cuda_platform, resource::host_platform> {
-  static constexpr cudaMemcpyKind value = cudaMemcpyDeviceToHost;
-};
-
-// Host to device specialization
-template <>
-struct copy_kind<resource::host_platform, resource::cuda_platform> {
-  static constexpr cudaMemcpyKind value = cudaMemcpyHostToDevice;
-};
-
-// Device to device specialization
-template <>
-struct copy_kind<resource::cuda_platform, resource::cuda_platform> {
-  static constexpr cudaMemcpyKind value = cudaMemcpyDeviceToDevice;
-};
 
 /**
  * @brief Check if a CUDA device supports managed memory features
@@ -181,8 +161,9 @@ inline void copy(T* src, T* dst, std::size_t count, cudaMemcpyKind kind)
 
   cudaError_t error = ::cudaMemcpy(dst, src, size, kind);
   if (error != cudaSuccess) {
-    UMPIRE_ERROR(runtime_error, fmt::format("cudaMemcpy(dst={}, src={}, size={}, kind={}) failed with error: {}", reinterpret_cast<void*>(dst),
-                                            reinterpret_cast<void*>(src), size, static_cast<int>(kind), cudaGetErrorString(error)));
+    UMPIRE_ERROR(runtime_error, fmt::format("cudaMemcpy(dst={}, src={}, size={}, kind={}) failed with error: {}",
+                                            reinterpret_cast<void*>(dst), reinterpret_cast<void*>(src), size,
+                                            static_cast<int>(kind), cudaGetErrorString(error)));
   }
 }
 
@@ -231,8 +212,8 @@ inline void memset(T* ptr, int value, std::size_t count)
 
   cudaError_t error = ::cudaMemset(ptr, value, size);
   if (error != cudaSuccess) {
-    UMPIRE_ERROR(runtime_error, fmt::format("cudaMemset(ptr={}, value={}, size={}) failed with error: {}", reinterpret_cast<void*>(ptr), value,
-                                            size, cudaGetErrorString(error)));
+    UMPIRE_ERROR(runtime_error, fmt::format("cudaMemset(ptr={}, value={}, size={}) failed with error: {}",
+                                            reinterpret_cast<void*>(ptr), value, size, cudaGetErrorString(error)));
   }
 }
 
@@ -278,9 +259,8 @@ inline void prefetch(T* ptr, int device, std::size_t count)
   int current_device;
   cudaError_t get_dev_err = cudaGetDevice(&current_device);
   if (get_dev_err != cudaSuccess) {
-    UMPIRE_ERROR(runtime_error,
-                 fmt::format("cudaGetDevice failed: {} ({})", cudaGetErrorString(get_dev_err),
-                             static_cast<int>(get_dev_err)));
+    UMPIRE_ERROR(runtime_error, fmt::format("cudaGetDevice failed: {} ({})", cudaGetErrorString(get_dev_err),
+                                            static_cast<int>(get_dev_err)));
   }
   int gpu = (device != cudaCpuDeviceId) ? device : current_device;
 #if CUDART_VERSION >= 13000
@@ -322,9 +302,8 @@ inline camp::resources::EventProxy<camp::resources::Resource> prefetch_async(T* 
   int current_device;
   cudaError_t get_dev_err = cudaGetDevice(&current_device);
   if (get_dev_err != cudaSuccess) {
-    UMPIRE_ERROR(runtime_error,
-                 fmt::format("cudaGetDevice failed: {} ({})", cudaGetErrorString(get_dev_err),
-                             static_cast<int>(get_dev_err)));
+    UMPIRE_ERROR(runtime_error, fmt::format("cudaGetDevice failed: {} ({})", cudaGetErrorString(get_dev_err),
+                                            static_cast<int>(get_dev_err)));
   }
   int gpu = (device != cudaCpuDeviceId) ? device : current_device;
 #if CUDART_VERSION >= 13000
@@ -369,7 +348,7 @@ struct copy<resource::cuda_platform, resource::cuda_platform> {
   template <typename T>
   static void exec(T* src, T* dst, std::size_t len)
   {
-    detail::copy(src, dst, len, detail::copy_kind<resource::cuda_platform, resource::cuda_platform>::value);
+    detail::copy(src, dst, len, cudaMemcpyDeviceToDevice);
   }
 
   /**
@@ -386,8 +365,7 @@ struct copy<resource::cuda_platform, resource::cuda_platform> {
   static camp::resources::EventProxy<camp::resources::Resource> exec(T* src, T* dst, std::size_t len,
                                                                      camp::resources::Resource& resource)
   {
-    return detail::copy_async(src, dst, len, resource,
-                              detail::copy_kind<resource::cuda_platform, resource::cuda_platform>::value);
+    return detail::copy_async(src, dst, len, resource, cudaMemcpyDeviceToDevice);
   }
 };
 
@@ -405,7 +383,7 @@ struct copy<resource::cuda_platform, resource::host_platform> {
   template <typename T>
   static void exec(T* src, T* dst, std::size_t len)
   {
-    detail::copy(src, dst, len, detail::copy_kind<resource::cuda_platform, resource::host_platform>::value);
+    detail::copy(src, dst, len, cudaMemcpyDeviceToHost);
   }
 
   /**
@@ -422,8 +400,7 @@ struct copy<resource::cuda_platform, resource::host_platform> {
   static camp::resources::EventProxy<camp::resources::Resource> exec(T* src, T* dst, std::size_t len,
                                                                      camp::resources::Resource& resource)
   {
-    return detail::copy_async(src, dst, len, resource,
-                              detail::copy_kind<resource::cuda_platform, resource::host_platform>::value);
+    return detail::copy_async(src, dst, len, resource, cudaMemcpyDeviceToHost);
   }
 };
 
@@ -441,7 +418,7 @@ struct copy<resource::host_platform, resource::cuda_platform> {
   template <typename T>
   static void exec(T* src, T* dst, std::size_t len)
   {
-    detail::copy(src, dst, len, detail::copy_kind<resource::host_platform, resource::cuda_platform>::value);
+    detail::copy(src, dst, len, cudaMemcpyHostToDevice);
   }
 
   /**
@@ -458,8 +435,7 @@ struct copy<resource::host_platform, resource::cuda_platform> {
   static camp::resources::EventProxy<camp::resources::Resource> exec(T* src, T* dst, std::size_t len,
                                                                      camp::resources::Resource& resource)
   {
-    return detail::copy_async(src, dst, len, resource,
-                              detail::copy_kind<resource::host_platform, resource::cuda_platform>::value);
+    return detail::copy_async(src, dst, len, resource, cudaMemcpyHostToDevice);
   }
 };
 
@@ -564,22 +540,22 @@ struct device_memset<resource::cuda_platform> {
 };
 
 // Memory advice operations define macro to reduce duplication
-#define DEFINE_CUDA_ADVICE_OP(op_name, advice_flag)                       \
-  template <>                                                             \
-  struct op_name<resource::cuda_platform> {                               \
-    /**                                                                   \
-     * @brief Apply memory advice operation                               \
-     *                                                                    \
-     * @tparam T Type of memory                                           \
-     * @param ptr Pointer to memory                                       \
-     * @param device Device to apply advice for                           \
-     * @param len Number of elements                                      \
-     */                                                                   \
-    template <typename T>                                                 \
-    static inline void exec(T* ptr, int device, std::size_t len)          \
-    {                                                                     \
-      detail::advise(ptr, len, device, advice_flag);                      \
-    }                                                                     \
+#define DEFINE_CUDA_ADVICE_OP(op_name, advice_flag)              \
+  template <>                                                    \
+  struct op_name<resource::cuda_platform> {                      \
+    /**                                                          \
+     * @brief Apply memory advice operation                      \
+     *                                                           \
+     * @tparam T Type of memory                                  \
+     * @param ptr Pointer to memory                              \
+     * @param device Device to apply advice for                  \
+     * @param len Number of elements                             \
+     */                                                          \
+    template <typename T>                                        \
+    static inline void exec(T* ptr, int device, std::size_t len) \
+    {                                                            \
+      detail::advise(ptr, len, device, advice_flag);             \
+    }                                                            \
   };
 
 DEFINE_CUDA_ADVICE_OP(set_accessed_by, cudaMemAdviseSetAccessedBy)

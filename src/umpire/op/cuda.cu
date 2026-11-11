@@ -1,3 +1,9 @@
+//////////////////////////////////////////////////////////////////////////////
+// Copyright (c) 2016-26, Lawrence Livermore National Security, LLC and Umpire
+// project contributors. See the COPYRIGHT file for details.
+//
+// SPDX-License-Identifier: (MIT)
+//////////////////////////////////////////////////////////////////////////////
 #include "umpire/op/cuda.hpp"
 
 namespace umpire {
@@ -50,8 +56,8 @@ void launch_device_memset(T* ptr, T value, std::size_t count, cudaStream_t strea
 
   cudaError_t set_dev_err = cudaSetDevice(device);
   if (set_dev_err != cudaSuccess) {
-    UMPIRE_ERROR(runtime_error,
-                 fmt::format("cudaSetDevice(device={}) failed with error: {}", device, cudaGetErrorString(set_dev_err)));
+    UMPIRE_ERROR(runtime_error, fmt::format("cudaSetDevice(device={}) failed with error: {}", device,
+                                            cudaGetErrorString(set_dev_err)));
   }
 
   constexpr int block_size = 256;
@@ -74,13 +80,11 @@ void launch_device_memset(T* ptr, T value, std::size_t count, cudaStream_t strea
   cudaError_t restore_err = cudaSetDevice(previous_device);
 
   if (err != cudaSuccess) {
-    UMPIRE_ERROR(runtime_error,
-                 fmt::format("device_memset kernel launch failed: {}", cudaGetErrorString(err)));
+    UMPIRE_ERROR(runtime_error, fmt::format("device_memset kernel launch failed: {}", cudaGetErrorString(err)));
   }
 
   if (sync_err != cudaSuccess) {
-    UMPIRE_ERROR(runtime_error,
-                 fmt::format("device_memset synchronization failed: {}", cudaGetErrorString(sync_err)));
+    UMPIRE_ERROR(runtime_error, fmt::format("device_memset synchronization failed: {}", cudaGetErrorString(sync_err)));
   }
 
   if (restore_err != cudaSuccess) {
@@ -133,7 +137,8 @@ template __global__ void umpire_device_memset_kernel<unsigned int>(unsigned int*
 template __global__ void umpire_device_memset_kernel<long>(long*, long, std::size_t);
 template __global__ void umpire_device_memset_kernel<unsigned long>(unsigned long*, unsigned long, std::size_t);
 template __global__ void umpire_device_memset_kernel<long long>(long long*, long long, std::size_t);
-template __global__ void umpire_device_memset_kernel<unsigned long long>(unsigned long long*, unsigned long long, std::size_t);
+template __global__ void umpire_device_memset_kernel<unsigned long long>(unsigned long long*, unsigned long long,
+                                                                         std::size_t);
 template __global__ void umpire_device_memset_kernel<float>(float*, float, std::size_t);
 template __global__ void umpire_device_memset_kernel<double>(double*, double, std::size_t);
 template __global__ void umpire_device_memset_kernel<bool>(bool*, bool, std::size_t);
@@ -165,13 +170,14 @@ template void device_memset<unsigned int>(unsigned int*, unsigned int, std::size
 template void device_memset<long>(long*, long, std::size_t, cudaStream_t, int);
 template void device_memset<unsigned long>(unsigned long*, unsigned long, std::size_t, cudaStream_t, int);
 template void device_memset<long long>(long long*, long long, std::size_t, cudaStream_t, int);
-template void device_memset<unsigned long long>(unsigned long long*, unsigned long long, std::size_t, cudaStream_t, int);
+template void device_memset<unsigned long long>(unsigned long long*, unsigned long long, std::size_t, cudaStream_t,
+                                                int);
 template void device_memset<float>(float*, float, std::size_t, cudaStream_t, int);
 template void device_memset<double>(double*, double, std::size_t, cudaStream_t, int);
 template void device_memset<bool>(bool*, bool, std::size_t, cudaStream_t, int);
 
-} //end namespace detail
+} // end namespace detail
 
-} //end namespace op
+} // end namespace op
 
-} //end namespace umpire
+} // end namespace umpire

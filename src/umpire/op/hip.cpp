@@ -1,3 +1,9 @@
+//////////////////////////////////////////////////////////////////////////////
+// Copyright (c) 2016-26, Lawrence Livermore National Security, LLC and Umpire
+// project contributors. See the COPYRIGHT file for details.
+//
+// SPDX-License-Identifier: (MIT)
+//////////////////////////////////////////////////////////////////////////////
 #include "umpire/op/hip.hpp"
 
 namespace umpire {
@@ -62,8 +68,7 @@ void launch_device_memset(T* ptr, T value, std::size_t count, hipStream_t stream
     grid_size = max_blocks;
   }
 
-  hipLaunchKernelGGL(umpire_device_memset_kernel<T>, dim3(grid_size), dim3(block_size), 0, stream,
-                     ptr, value, count);
+  hipLaunchKernelGGL(umpire_device_memset_kernel<T>, dim3(grid_size), dim3(block_size), 0, stream, ptr, value, count);
 
   hipError_t err = hipGetLastError();
 
@@ -75,13 +80,11 @@ void launch_device_memset(T* ptr, T value, std::size_t count, hipStream_t stream
   hipError_t restore_err = hipSetDevice(previous_device);
 
   if (err != hipSuccess) {
-    UMPIRE_ERROR(runtime_error,
-                 fmt::format("device_memset kernel launch failed: {}", hipGetErrorString(err)));
+    UMPIRE_ERROR(runtime_error, fmt::format("device_memset kernel launch failed: {}", hipGetErrorString(err)));
   }
 
   if (sync_err != hipSuccess) {
-    UMPIRE_ERROR(runtime_error,
-                 fmt::format("device_memset synchronization failed: {}", hipGetErrorString(sync_err)));
+    UMPIRE_ERROR(runtime_error, fmt::format("device_memset synchronization failed: {}", hipGetErrorString(sync_err)));
   }
 
   if (restore_err != hipSuccess) {
@@ -134,7 +137,8 @@ template __global__ void umpire_device_memset_kernel<unsigned int>(unsigned int*
 template __global__ void umpire_device_memset_kernel<long>(long*, long, std::size_t);
 template __global__ void umpire_device_memset_kernel<unsigned long>(unsigned long*, unsigned long, std::size_t);
 template __global__ void umpire_device_memset_kernel<long long>(long long*, long long, std::size_t);
-template __global__ void umpire_device_memset_kernel<unsigned long long>(unsigned long long*, unsigned long long, std::size_t);
+template __global__ void umpire_device_memset_kernel<unsigned long long>(unsigned long long*, unsigned long long,
+                                                                         std::size_t);
 template __global__ void umpire_device_memset_kernel<float>(float*, float, std::size_t);
 template __global__ void umpire_device_memset_kernel<double>(double*, double, std::size_t);
 template __global__ void umpire_device_memset_kernel<bool>(bool*, bool, std::size_t);
@@ -171,8 +175,8 @@ template void device_memset<float>(float*, float, std::size_t, hipStream_t, int)
 template void device_memset<double>(double*, double, std::size_t, hipStream_t, int);
 template void device_memset<bool>(bool*, bool, std::size_t, hipStream_t, int);
 
-} //end namespace detail
+} // end namespace detail
 
-} //end namespace op
+} // end namespace op
 
-} //end namespace umpire
+} // end namespace umpire

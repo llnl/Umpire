@@ -1,9 +1,15 @@
+//////////////////////////////////////////////////////////////////////////////
+// Copyright (c) 2016-26, Lawrence Livermore National Security, LLC and Umpire
+// project contributors. See the COPYRIGHT file for details.
+//
+// SPDX-License-Identifier: (MIT)
+//////////////////////////////////////////////////////////////////////////////
 #pragma once
 
 #include <cstddef>
 #include <limits>
 #include <type_traits>
-#include "camp/resource.hpp"
+
 #include "umpire/util/error.hpp"
 
 namespace umpire {
@@ -24,27 +30,11 @@ inline std::size_t get_size(std::size_t count)
     return count;
   } else {
     if (count > (std::numeric_limits<std::size_t>::max() / sizeof(T))) {
-      UMPIRE_ERROR(runtime_error,
-                   fmt::format("Requested size overflow: count ({}) * sizeof(T) ({}) exceeds size_t max", count,
-                               sizeof(T)));
+      UMPIRE_ERROR(runtime_error, fmt::format("Requested size overflow: count ({}) * sizeof(T) ({}) exceeds size_t max",
+                                              count, sizeof(T)));
     }
     return count * sizeof(T);
   }
-}
-
-/**
- * @brief Wrap a resource in an EventProxy
- *
- * Nothing is recorded at construction; camp produces the event lazily when the
- * proxy is converted to an Event (or waited on).
- *
- * @param resource The resource whose event the proxy will produce
- * @return camp::resources::EventProxy<camp::resources::Resource> Proxy for the resource
- */
-inline camp::resources::EventProxy<camp::resources::Resource> 
-make_event_proxy(camp::resources::Resource& resource) noexcept
-{
-  return camp::resources::EventProxy<camp::resources::Resource>{resource};
 }
 
 } // namespace detail
