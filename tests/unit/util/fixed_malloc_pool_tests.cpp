@@ -155,4 +155,37 @@ TEST_F(FixedMallocPoolTest, DeallocateUnknownPointer)
   ASSERT_THROW(pool.deallocate(&not_from_pool), umpire::runtime_error);
 }
 
+TEST(FixedMallocPoolSmallObjectTest, OddSizedObjects)
+{
+  // Valid slot sizes need not be multiples of the free-list link alignment.
+  constexpr std::size_t bytes = sizeof(unsigned int) + 1;
+  constexpr std::size_t count = 8;
+  umpire::util::FixedMallocPool pool{bytes, count};
+  std::vector<void*> ptrs;
+
+  for (std::size_t i = 0; i < count; ++i) {
+    void* ptr = pool.allocate(bytes);
+    ASSERT_NE(ptr, nullptr);
+    std::memset(ptr, static_cast<int>(i + 1), bytes);
+    ptrs.push_back(ptr);
+  }
+
+  for (std::size_t i = 0; i < count; ++i) {
+    const auto* data = static_cast<const unsigned char*>(ptrs[i]);
+    for (std::size_t j = 0; j < bytes; ++j) {
+      EXPECT_EQ(data[j], i + 1);
+    }
+    pool.deallocate(ptrs[i]);
+  }
+
+  for (auto it = ptrs.rbegin(); it != ptrs.rend(); ++it) {
+    EXPECT_EQ(pool.allocate(bytes), *it);
+  }
+  EXPECT_EQ(pool.numPools(), 1);
+
+  for (void* ptr : ptrs) {
+    pool.deallocate(ptr);
+  }
+}
+
 } // namespace

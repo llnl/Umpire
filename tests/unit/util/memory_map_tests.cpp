@@ -4,6 +4,8 @@
 //
 // SPDX-License-Identifier: (MIT)
 //////////////////////////////////////////////////////////////////////////////
+#include <cstdint>
+
 #include "gtest/gtest.h"
 #include "umpire/util/MemoryMap.hpp"
 
@@ -151,4 +153,53 @@ TEST_F(MemoryMapTest, ordering)
   std::tie(ib, inserted) = map.insert(b, 2);
 
   ASSERT_EQ(++ia, ib);
+}
+
+TEST_F(MemoryMapTest, PackedKeys)
+{
+  // Enough nearby keys force Judy to split nodes and pack shortened keys
+  // at offsets that are not aligned to a machine word.
+  constexpr int count = 512;
+  auto key = [](int i) { return reinterpret_cast<void*>(std::uintptr_t{0x10000} + 2 * i); };
+
+  for (int i = 0; i < count; ++i) {
+    ASSERT_TRUE(map.insert(key(i), i).second);
+  }
+  ASSERT_EQ(map.size(), count);
+
+  for (int i = 0; i < count; ++i) {
+    auto found = map.find(key(i));
+    ASSERT_NE(found, map.end());
+    EXPECT_EQ(found->first, key(i));
+    EXPECT_EQ(*found->second, i);
+
+    auto between = reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(key(i)) + 1);
+    EXPECT_EQ(map.find(between), map.end());
+    auto before = map.findOrBefore(between);
+    ASSERT_NE(before, map.end());
+    EXPECT_EQ(before->first, key(i));
+    EXPECT_EQ(*before->second, i);
+  }
+
+  int expected = 0;
+  for (const auto& entry : map) {
+    EXPECT_EQ(entry.first, key(expected));
+    EXPECT_EQ(*entry.second, expected);
+    ++expected;
+  }
+  EXPECT_EQ(expected, count);
+
+  for (int i = 0; i < count; i += 2) {
+    map.erase(key(i));
+    EXPECT_EQ(map.find(key(i)), map.end());
+  }
+  EXPECT_EQ(map.size(), count / 2);
+
+  expected = 1;
+  for (const auto& entry : map) {
+    EXPECT_EQ(entry.first, key(expected));
+    EXPECT_EQ(*entry.second, expected);
+    expected += 2;
+  }
+  EXPECT_EQ(expected, count + 1);
 }

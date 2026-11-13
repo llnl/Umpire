@@ -359,7 +359,8 @@ unsigned int judy_key( Judy * judy, unsigned char * buff, unsigned int max ) {
                 base = ( unsigned char * )( judy->stack[idx].next & JUDY_mask );
 
                 if( judy->depth ) {
-                    value = *( judyvalue * )( base + slot * keysize );
+                    // Packed keys need not be aligned for judyvalue.
+                    memcpy( &value, base + slot * keysize, sizeof( value ) );
                     value &= JudyMask[keysize];
                     dest[depth++] |= value;
                     len += keysize;
@@ -502,7 +503,8 @@ JudySlot * judy_slot( Judy * judy, const unsigned char * buff, unsigned int max 
                 //  find slot > key
 
                 while( slot-- ) {
-                    test = *( judyvalue * )( base + slot * keysize );
+                    // Packed keys need not be aligned for judyvalue.
+                    memcpy( &test, base + slot * keysize, sizeof( test ) );
 #if BYTE_ORDER == BIG_ENDIAN
                     test >>= 8 * ( JUDY_key_size - keysize );
 #else
@@ -905,7 +907,7 @@ JudySlot * judy_last( Judy * judy, JudySlot next, unsigned int off, unsigned int
                         next = inner[slot & 0x0F];
                         if( next ) {
                             if( ( !judy->depth && !slot ) || ( judy->depth && depth == judy->depth ) ) {
-                                return &inner[0];
+                                return &inner[slot & 0x0F];
                             } else {
                                 break;
                             }
@@ -1091,7 +1093,7 @@ JudySlot * judy_prv( Judy * judy ) {
                     if( inner ) {
                         if( inner[slot & 0x0F] ) {
                             if( ( !judy->depth && !slot ) || ( judy->depth && depth == judy->depth ) ) {
-                                return &inner[0];
+                                return &inner[slot & 0x0F];
                             } else {
                                 return judy_last( judy, inner[slot & 0x0F], off + 1, depth );
                             }
@@ -1319,7 +1321,8 @@ JudySlot * judy_cell( Judy * judy, const unsigned char * buff, unsigned int max 
                 //  find slot > key
 
                 while( slot-- ) {
-                    test = *( judyvalue * )( base + slot * keysize );
+                    // Packed keys need not be aligned for judyvalue.
+                    memcpy( &test, base + slot * keysize, sizeof( test ) );
 #if BYTE_ORDER == BIG_ENDIAN
                     test >>= 8 * ( JUDY_key_size - keysize );
 #else
