@@ -27,12 +27,12 @@ namespace util {
 
 inline unsigned char* FixedMallocPool::addr_from_index(const FixedMallocPool::Pool& p, unsigned int i) const
 {
-  return p.data + i * m_obj_bytes;
+  return p.data + i * m_slot_bytes;
 }
 
 inline unsigned int FixedMallocPool::index_from_addr(const FixedMallocPool::Pool& p, const unsigned char* ptr) const
 {
-  return static_cast<unsigned int>((ptr - p.data) / m_obj_bytes);
+  return static_cast<unsigned int>((ptr - p.data) / m_slot_bytes);
 }
 
 FixedMallocPool::Pool::Pool(const std::size_t object_bytes, const std::size_t objects_per_pool)
@@ -43,10 +43,14 @@ FixedMallocPool::Pool::Pool(const std::size_t object_bytes, const std::size_t ob
 }
 
 FixedMallocPool::FixedMallocPool(const std::size_t object_bytes, const std::size_t objects_per_pool)
-    : m_obj_bytes(object_bytes), m_obj_per_pool(objects_per_pool), m_data_bytes(m_obj_bytes * m_obj_per_pool), m_pool()
+    : m_obj_bytes(object_bytes),
+      m_slot_bytes(std::max(object_bytes, sizeof(unsigned int))),
+      m_obj_per_pool(objects_per_pool),
+      m_data_bytes(m_slot_bytes * m_obj_per_pool),
+      m_pool()
 {
-  // Free-list links are stored in the slots themselves
-  UMPIRE_ASSERT(object_bytes >= sizeof(unsigned int));
+  // Even small objects need enough storage for a free-list link when recycled.
+  UMPIRE_ASSERT(object_bytes > 0);
   // Slot indices (free-list links and num_used) are unsigned int
   UMPIRE_ASSERT(objects_per_pool <= static_cast<std::size_t>(std::numeric_limits<unsigned int>::max()));
   newPool();
@@ -60,14 +64,15 @@ FixedMallocPool::~FixedMallocPool()
 
 void FixedMallocPool::newPool()
 {
-  m_pool.emplace_back(m_obj_bytes, m_obj_per_pool);
+  m_pool.emplace_back(m_slot_bytes, m_obj_per_pool);
 }
 
 void* FixedMallocPool::allocInPool(Pool& p) noexcept
 {
   if (p.free_list < m_obj_per_pool) {
     unsigned char* ret = addr_from_index(p, p.free_list);
-    p.free_list = *reinterpret_cast<unsigned int*>(ret);
+    // Slot sizes need not be multiples of alignof(unsigned int).
+    std::memcpy(&p.free_list, ret, sizeof(p.free_list));
     return static_cast<void*>(ret);
   }
 
@@ -112,7 +117,7 @@ void FixedMallocPool::deallocate(void* ptr)
     const unsigned char* t_ptr = reinterpret_cast<unsigned char*>(ptr);
     const ptrdiff_t offset = t_ptr - p.data;
     if ((offset >= 0) && (offset < static_cast<ptrdiff_t>(m_data_bytes))) {
-      *reinterpret_cast<unsigned int*>(ptr) = p.free_list;
+      std::memcpy(ptr, &p.free_list, sizeof(p.free_list));
       p.free_list = index_from_addr(p, t_ptr);
       return;
     }
