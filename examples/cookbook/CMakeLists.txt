@@ -245,5 +245,4 @@ blt_add_executable(
 list(APPEND umpire_cookbooks recipe_named_allocation)
 
 install(TARGETS ${umpire_cookbooks} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-
 umpire_add_code_checks(PREFIX cookbook)

@@ -9,6 +9,10 @@
 #include <cstdlib>
 
 #include "umpire/ResourceManager.hpp"
+#include "umpire/config.hpp"
+#if defined(UMPIRE_RM_USE_NEW_OPS)
+#include "umpire/op.hpp"
+#endif
 #include "umpire/strategy/AllocationStrategy.hpp"
 #include "umpire/util/AllocationRecord.hpp"
 #include "umpire/util/Macros.hpp"
@@ -26,7 +30,11 @@ void GenericReallocateOperation::transform(void* current_ptr, void** new_ptr,
   const std::size_t old_size = current_allocation->size;
   const std::size_t copy_size = (old_size > new_size) ? new_size : old_size;
 
+#if defined(UMPIRE_RM_USE_NEW_OPS)
+  op::op_caller<op::copy>::exec(current_ptr, *new_ptr, copy_size);
+#else
   ResourceManager::getInstance().copy(*new_ptr, current_ptr, copy_size);
+#endif
 
   allocator.deallocate(current_ptr);
 }
@@ -41,7 +49,15 @@ camp::resources::EventProxy<camp::resources::Resource> GenericReallocateOperatio
   const std::size_t old_size = current_allocation->size;
   const std::size_t copy_size = (old_size > new_size) ? new_size : old_size;
 
+#if defined(UMPIRE_RM_USE_NEW_OPS)
+  auto event = op::op_caller<op::copy>::exec(current_ptr, *new_ptr, copy_size, ctx);
+#else
   auto event = ResourceManager::getInstance().copy(*new_ptr, current_ptr, ctx, copy_size);
+#endif
+
+  // NOTE: Intentional blocking point: the copy may still be reading
+  // current_ptr, so wait for it to complete before freeing the old buffer.
+  static_cast<camp::resources::Event>(event).wait();
 
   allocator.deallocate(current_ptr);
 

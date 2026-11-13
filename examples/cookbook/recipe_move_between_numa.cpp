@@ -8,6 +8,7 @@
 
 #include "umpire/Allocator.hpp"
 #include "umpire/ResourceManager.hpp"
+#include "umpire/op.hpp"
 #include "umpire/strategy/NumaPolicy.hpp"
 #include "umpire/util/Macros.hpp"
 #include "umpire/util/error.hpp"
@@ -52,7 +53,7 @@ int main(int, char**)
     }
 
     // Touch it
-    rm.memset(dst_ptr, 0);
+    umpire::memset(dst_ptr, 0, alloc_size);
 
     // Verify NUMA node
     if (umpire::numa::get_location(dst_ptr) != host_nodes[1]) {
@@ -82,7 +83,7 @@ int main(int, char**)
 
     // Touch it -- this currently uses the host memset operation (thus, copying
     // the memory back)
-    rm.memset(dst_ptr, 0);
+    umpire::memset(dst_ptr, 0, alloc_size);
 
     // Verify NUMA node
     if (umpire::numa::get_location(dst_ptr) != device_nodes[0]) {

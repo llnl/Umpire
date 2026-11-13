@@ -7,6 +7,7 @@
 #include <iostream>
 
 #include "umpire/ResourceManager.hpp"
+#include "umpire/op.hpp"
 #include "umpire/strategy/QuickPool.hpp"
 
 constexpr int BLOCK_SIZE = 256;
@@ -36,8 +37,8 @@ int main(int, char**)
 
   auto pool1 = rm.makeAllocator<umpire::strategy::QuickPool>("pool1", rm.getAllocator("DEVICE::1"));
 
-  double* a = static_cast<double*>(pool0.allocate(NUM_THREADS * sizeof(double)));
-  double* b = static_cast<double*>(pool1.allocate(NUM_THREADS * sizeof(double)));
+  double* src_data = static_cast<double*>(pool0.allocate(NUM_THREADS * sizeof(double)));
+  double* dst_data = static_cast<double*>(pool1.allocate(NUM_THREADS * sizeof(double)));
 
   int NUM_BLOCKS = NUM_THREADS / BLOCK_SIZE;
 
@@ -47,7 +48,7 @@ int main(int, char**)
     UMPIRE_ERROR(umpire::runtime_error,
                  fmt::format("Error when trying to set CUDA Device: {}", cudaGetErrorString(err)));
   }
-  touch_data<<<NUM_BLOCKS, BLOCK_SIZE>>>(a, NUM_THREADS);
+  touch_data<<<NUM_BLOCKS, BLOCK_SIZE>>>(src_data, NUM_THREADS);
   err = cudaDeviceSynchronize();
   if (err != cudaSuccess) {
     UMPIRE_ERROR(umpire::runtime_error,
@@ -59,7 +60,7 @@ int main(int, char**)
   if (err != hipSuccess) {
     UMPIRE_ERROR(umpire::runtime_error, fmt::format("Error when trying to set HIP Device: {}", hipGetErrorString(err)));
   }
-  hipLaunchKernelGGL(touch_data, dim3(NUM_BLOCKS), dim3(BLOCK_SIZE), 0, 0, a, NUM_THREADS);
+  hipLaunchKernelGGL(touch_data, dim3(NUM_BLOCKS), dim3(BLOCK_SIZE), 0, 0, src_data, NUM_THREADS);
   err = hipDeviceSynchronize();
   if (err != hipSuccess) {
     UMPIRE_ERROR(umpire::runtime_error,
@@ -67,12 +68,13 @@ int main(int, char**)
   }
 #endif
 
-  rm.copy(b, a);
-  b = static_cast<double*>(rm.move(b, rm.getAllocator("HOST")));
+  // Copy src_data (DEVICE::0) -> dst_data (DEVICE::1); NUM_THREADS is an element count, not bytes.
+  umpire::copy(src_data, dst_data, NUM_THREADS);
+  dst_data = static_cast<double*>(rm.move(dst_data, rm.getAllocator("HOST")));
 
-  UMPIRE_ASSERT(b[BLOCK_SIZE] == (BLOCK_SIZE * MULTIPLE) && "Error: incorrect value!");
-  std::cout << "Kernel succeeded! Expected result returned - " << b[BLOCK_SIZE] << std::endl;
+  UMPIRE_ASSERT(dst_data[BLOCK_SIZE] == (BLOCK_SIZE * MULTIPLE) && "Error: incorrect value!");
+  std::cout << "Kernel succeeded! Expected result returned - " << dst_data[BLOCK_SIZE] << std::endl;
 
-  rm.deallocate(a);
-  rm.deallocate(b);
+  rm.deallocate(src_data);
+  rm.deallocate(dst_data);
 }

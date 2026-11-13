@@ -63,7 +63,6 @@ if (UMPIRE_ENABLE_HIP)
     NAME multi_device
     SOURCES multi_device.cpp
     DEPENDS_ON umpire blt::hip)
-
   list(APPEND umpire_examples multi_device)
 endif()
 

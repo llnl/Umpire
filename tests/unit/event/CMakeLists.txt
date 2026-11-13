@@ -44,3 +44,18 @@ blt_add_executable(
 blt_add_test(
   NAME event_recording_tests
   COMMAND event_recording_tests)
+
+blt_add_executable(
+  NAME operation_recording_tests
+  SOURCES operation_recording_tests.cpp
+  DEPENDS_ON umpire gtest)
+
+blt_add_target_compile_flags(
+  TO operation_recording_tests
+  FLAGS ${UMPIRE_DISABLE_DEPRECATED_WARNINGS_FLAG})
+
+blt_add_test(
+  NAME operation_recording_tests
+  COMMAND operation_recording_tests)
+
+set_tests_properties(operation_recording_tests PROPERTIES ENVIRONMENT "UMPIRE_EVENTS=1")
