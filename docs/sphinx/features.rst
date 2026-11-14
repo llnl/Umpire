@@ -13,6 +13,7 @@ Features
   features/shared_memory_allocators
   features/backtrace
   features/file_output
+  features/introspection_header
   features/logging_and_replay
   features/operations
   features/strategies

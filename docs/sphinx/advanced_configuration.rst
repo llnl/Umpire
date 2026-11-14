@@ -28,7 +28,8 @@ Here is a summary of the configuration options, their default value, and meaning
     ``UMPIRE_ENABLE_BACKTRACE_SYMBOLS``    Off                Enable symbol lookup for backtraces
     ``UMPIRE_ENABLE_BACKTRACE``            Off                Enable backtraces for allocations
     ``UMPIRE_ENABLE_C``                    Off                Build the C API
-    ``UMPIRE_ENABLE_FILE_RESOURCE``        Off                Enable FILE support      
+    ``UMPIRE_ENABLE_FILE_RESOURCE``        Off                Enable FILE support
+    ``UMPIRE_ENABLE_INTROSPECTION_HEADER`` Off                Store introspection metadata in a header in front of each allocation
     ``UMPIRE_ENABLE_IPC_SHARED_MEMORY``    UMPIRE_ENABLE_MPI  Enable Shared Memory support
     ``UMPIRE_ENABLE_LOGGING``              On                 Enable Logging within Umpire
     ``UMPIRE_ENABLE_NUMA``                 Off                Enable NUMA support
@@ -82,9 +83,16 @@ These arguments are explained in more detail below:
   ResourceManager through a C interface.
 
 * ``UMPIRE_ENABLE_FILE_RESOURCE``
-  This option will allow the build to make all File Memory Allocation files. 
-  If Umpire is built without FILE, CUDA or HIP support, then only the ``HOST`` 
+  This option will allow the build to make all File Memory Allocation files.
+  If Umpire is built without FILE, CUDA or HIP support, then only the ``HOST``
   allocator is available for use.
+
+* ``UMPIRE_ENABLE_INTROSPECTION_HEADER``
+  This option replaces the allocation map with a small header stored in front
+  of each allocation, reducing the introspection overhead on the allocation
+  path. All memory must be readable from the host, and some queries are not
+  available; see :doc:`features/introspection_header`. Incompatible with
+  ``UMPIRE_ENABLE_BACKTRACE``.
 
 * ``UMPIRE_ENABLE_IPC_SHARED_MEMORY``
   This option enables support for interprocess shared memory.  Currently, this
