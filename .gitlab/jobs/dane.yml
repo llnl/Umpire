@@ -31,13 +31,13 @@ gcc_11_2_1_numa:
 
 clang_14_0_6_gcc_11_2_1_sqlite_experimental:
   variables:
-    SPEC: "~shared +sqlite_experimental +tools tests=basic %clang-14-gcc-11"
+    SPEC: "~shared +sqlite_experimental +tools tests=basic %%clang-14-gcc-11"
   extends: .job_on_dane
 
 # Develop builds against specific tpl version.
 clang_14_0_6_gcc_11_2_1_tpls:
   variables:
-    SPEC: "~shared +fortran +tools tests=basic %clang-14-gcc-11"
+    SPEC: "~shared +fortran +tools tests=basic %%clang-14-gcc-11"
   extends: .job_on_dane
 
 gcc_11_2_1_tpls:
