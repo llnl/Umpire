@@ -1,0 +1,3 @@
+upstreams:
+  umpire_ci_upstream:
+    install_tree: "${UMPIRE_CI_UPSTREAM_INSTALL_TREE}"
