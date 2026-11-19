@@ -1,11 +1,11 @@
 # Maintaining host-configs with `rad-bat`
 
-Every maintained Umpire build-and-test job defines both `SPEC` and
+Every maintained Umpire build-and-test job defines both `RAD_BAT_SPEC` and
 `RAD_BAT_HOST_CONFIG_NAME`. With `RAD_BAT_MODE` unset, `rad-bat` therefore
 selects host-config mode. A missing file is an error and never causes an
 implicit Spack invocation.
 
-A job with only `SPEC` selects Spack mode. A job with only a host-config name
+A job with only `RAD_BAT_SPEC` selects Spack mode. A job with only a host-config name
 selects host-config mode. If both are present, host-config mode wins unless an
 explicit `RAD_BAT_MODE` overrides the selection. Each job logs the set/unset
 inputs and selected mode without printing their values.
