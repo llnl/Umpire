@@ -91,11 +91,14 @@ Using host-config files to build Umpire
   $ cmake --build -j .
   $ ctest --output-on-failure -T test
 
-It is also possible to use this configuration with the CI script outside of CI:
+It is also possible to run Umpire's complete build-and-test sequence with
+``rad-bat`` outside CI:
 
 .. code-block:: bash
 
-  $ HOST_CONFIG=<path_to>/<host-config>.cmake scripts/gitlab/build_and_test.sh
+  $ scripts/radiuss-spack-configs/bin/rad-bat host-config \
+      --host-config <path_to>/<host-config>.cmake \
+      --work-dir .rad-bat-work
 
 Using Uberenv to configure and run Leak Sanitizer
 -------------------------------------------------
@@ -126,4 +129,3 @@ Additionally, the Leak Sanitizer can be run on one specific test (in this exampl
   $ ASAN_OPTIONS=detect_leaks=1 ctest -T test -R replay --output-on-failure
 
 Depending on the output given when running the test with the Leak Sanitizer, it may be useful to use ``addr2line -e <./path_to/executable> <address_of_leak>`` to see the exact line the output is referring to.
-

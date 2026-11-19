@@ -19,14 +19,16 @@
 # Override rocm 7.2.1 job to allow failure
 rocmcc_7_2_1_hip:
   variables:
-    SPEC: "${PROJECT_TIOGA_VARIANTS} +rocm amdgpu_target=gfx90a %llvm-amdgpu@=7.2.1 ^hip@7.2.1 ${PROJECT_TIOGA_DEPS}"
+    RAD_BAT_SPEC: "${PROJECT_TIOGA_VARIANTS} +rocm amdgpu_target=gfx90a %llvm-amdgpu@=7.2.1 ^hip@7.2.1 ${PROJECT_TIOGA_DEPS}"
+    RAD_BAT_HOST_CONFIG_NAME: "tioga-rocmcc_7_2_1_hip.cmake"
   extends: .job_on_tioga
   allow_failure: true
 
 # We override the cce job because we can’t use +device-alloc with it
 cce_21_0_0:
   variables:
-    SPEC: "~shared +fortran tests=basic %cce@=21.0.0"
+    RAD_BAT_SPEC: "~shared +fortran tests=basic %cce@=21.0.0"
+    RAD_BAT_HOST_CONFIG_NAME: "tioga-cce_21_0_0.cmake"
   extends: .job_on_tioga
 
 ############
@@ -42,10 +44,12 @@ cce_21_0_0:
 ###
 rocmcc_6.4.3_hip_openmp_device_alloc:
   variables:
-    SPEC: "~shared +fortran +openmp +rocm +device_alloc tests=basic amdgpu_target=gfx90a %llvm-amdgpu@=6.4.3 ^hip@6.4.3"
+    RAD_BAT_SPEC: "~shared +fortran +openmp +rocm +device_alloc tests=basic amdgpu_target=gfx90a %llvm-amdgpu@=6.4.3 ^hip@6.4.3"
+    RAD_BAT_HOST_CONFIG_NAME: "tioga-rocmcc_6.4.3_hip_openmp_device_alloc.cmake"
   extends: .job_on_tioga
 
 rocmcc_6.4.3_hip_deviceconst:
   variables:
-    SPEC: "~shared +fortran +deviceconst +rocm tests=basic amdgpu_target=gfx90a %llvm-amdgpu@=6.4.3 ^hip@6.4.3"
+    RAD_BAT_SPEC: "~shared +fortran +deviceconst +rocm tests=basic amdgpu_target=gfx90a %llvm-amdgpu@=6.4.3 ^hip@6.4.3"
+    RAD_BAT_HOST_CONFIG_NAME: "tioga-rocmcc_6.4.3_hip_deviceconst.cmake"
   extends: .job_on_tioga
