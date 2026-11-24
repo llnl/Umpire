@@ -98,16 +98,87 @@ format_elapsed_hms ()
     printf '%02d:%02d:%02d' $((elapsed / 3600)) $(((elapsed % 3600) / 60)) $((elapsed % 60))
 }
 
+# Write the accumulated section timings as a machine-readable JSON file. This is
+# registered as an EXIT trap so that timings are captured even when the build
+# fails: each completed section is recorded by section_end before any early
+# exit. Built with printf to avoid a jq dependency. Must not change the script
+# exit status, so the incoming code is captured first and never overridden.
+write_timings_file ()
+{
+    local exit_code=$?
+    local timings_file="${project_dir}/timings.json"
+    local now=$(date +%s)
+    local total_seconds=$((now - script_start_time))
+
+    {
+        printf '{\n'
+        printf '  "schema": 1,\n'
+        printf '  "sha": "%s",\n' "${CI_COMMIT_SHA:-}"
+        printf '  "short_sha": "%s",\n' "${CI_COMMIT_SHORT_SHA:-}"
+        printf '  "ts": %s,\n' "${script_start_time}"
+        printf '  "machine": "%s",\n' "${CI_MACHINE:-${truehostname}}"
+        printf '  "job": "%s",\n' "${CI_JOB_NAME:-}"
+        printf '  "spec": "%s",\n' "${spec//\"/\\\"}"
+        printf '  "pipeline_id": "%s",\n' "${CI_PIPELINE_ID:-}"
+        printf '  "exit_code": %s,\n' "${exit_code}"
+        printf '  "total_seconds": %s,\n' "${total_seconds}"
+        printf '  "sections": ['
+
+        local first=true
+        local record
+        for record in "${timing_records[@]:-}"
+        do
+            [[ -z "${record}" ]] && continue
+            local name="${record%%|*}"
+            local rest="${record#*|}"
+            local depth="${rest%%|*}"
+            rest="${rest#*|}"
+            local parent="${rest%%|*}"
+            local seconds="${rest##*|}"
+            if [[ "${first}" == true ]]
+            then
+                first=false
+                printf '\n'
+            else
+                printf ',\n'
+            fi
+            printf '    {"name": "%s", "depth": %s, "parent": "%s", "seconds": %s}' \
+                "${name}" "${depth}" "${parent}" "${seconds}"
+        done
+        if [[ "${first}" == false ]]
+        then
+            printf '\n  ]\n'
+        else
+            printf ']\n'
+        fi
+        printf '}\n'
+    } > "${timings_file}" 2>/dev/null || print_warning "Failed to write timings file"
+
+    print_info "Wrote section timings to ${timings_file}"
+}
+
 # Track script start time for elapsed time calculations
 script_start_time=$(date +%s)
 
+# Always emit machine-readable section timings on exit (success or failure).
+trap write_timings_file EXIT
+
 # Storage for section start times (supports nesting)
 declare -A section_start_times
+
+# Storage for section metadata, used to emit machine-readable timings.
+declare -A section_names
+declare -A section_depths
+declare -A section_parents
 
 # Section stack for tracking nested sections
 section_id_stack=()
 section_counter=0
 section_indent=""
+
+# Accumulated per-section timing records ("name|depth|parent|seconds"), one per
+# completed section. Consumed by write_timings_file at script exit.
+timing_records=()
 
 # GitLab CI collapsible section helpers with nesting support
 section_start ()
@@ -133,6 +204,19 @@ section_start ()
 
     # Store section start time for later calculation
     section_start_times[${section_id}]=${timestamp}
+
+    # Store section metadata for machine-readable timings. The depth is the
+    # current stack size and the parent is the section currently on top of the
+    # stack (empty for top-level sections), both captured before pushing.
+    section_names[${section_id}]="${section_title}"
+    section_depths[${section_id}]=${#section_id_stack[@]}
+    if [[ ${#section_id_stack[@]} -gt 0 ]]
+    then
+        local parent_id="${section_id_stack[$((${#section_id_stack[@]} - 1))]}"
+        section_parents[${section_id}]="${section_names[${parent_id}]:-}"
+    else
+        section_parents[${section_id}]=""
+    fi
 
     # Push section ID onto stack
     section_id_stack+=("${section_id}")
@@ -175,8 +259,14 @@ section_end ()
     echo -e "\e[1;30m${section_indent}~ ${current_time} | ${total_elapsed_formatted} | ${section_elapsed_formatted}\e[0m"
     echo -e "\e[1;30m${section_indent}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\e[0m"
 
-    # Clean up stored time
+    # Record a machine-readable timing for this section.
+    timing_records+=("${section_names[${section_id}]:-${section_id}}|${section_depths[${section_id}]:-0}|${section_parents[${section_id}]:-}|${section_elapsed}")
+
+    # Clean up stored data
     unset section_start_times[${section_id}]
+    unset section_names[${section_id}]
+    unset section_depths[${section_id}]
+    unset section_parents[${section_id}]
 }
 
 # For convenience, a helper function to run a command within a section and handle errors
