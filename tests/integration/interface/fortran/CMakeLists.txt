@@ -39,17 +39,10 @@ blt_add_executable(
   DEFINES ${fortran_test_defines}
   DEPENDS_ON ${fortran_tests_depends})
 
-if (Fortran_COMPILER_FAMILY_IS_CLANG)
-  set_source_files_properties(
-    allocator_fortran_tests.F
-    PROPERTIES
-    COMPILE_FLAGS -Mfree)
-else()
-  set_source_files_properties(
-    allocator_fortran_tests.F
-    PROPERTIES
-    Fortran_FORMAT FREE)
-endif()
+set_source_files_properties(
+  allocator_fortran_tests.F
+  PROPERTIES
+  Fortran_FORMAT FREE)
 
 blt_add_test(
   NAME allocator_fortran_tests
@@ -61,17 +54,10 @@ blt_add_executable(
   DEFINES ${fortran_test_defines}
   DEPENDS_ON ${fortran_tests_depends})
 
-if (Fortran_COMPILER_FAMILY_IS_CLANG)
-  set_source_files_properties(
-    op_fortran_tests.F 
-    PROPERTIES
-    COMPILE_FLAGS -Mfree)
-else()
-  set_source_files_properties(
-    op_fortran_tests.F
-    PROPERTIES
-    Fortran_FORMAT FREE)
-endif()
+set_source_files_properties(
+  op_fortran_tests.F
+  PROPERTIES
+  Fortran_FORMAT FREE)
 
 blt_add_test(
   NAME op_fortran_tests
@@ -83,17 +69,10 @@ blt_add_executable(
   DEFINES ${fortran_test_defines}
   DEPENDS_ON ${fortran_tests_depends})
 
-if (Fortran_COMPILER_FAMILY_IS_CLANG)
-  set_source_files_properties(
-    introspection_fortran_tests.F
-    PROPERTIES
-    COMPILE_FLAGS -Mfree)
-else()
-  set_source_files_properties(
-    introspection_fortran_tests.F
-    PROPERTIES
-    Fortran_FORMAT FREE)
-endif()
+set_source_files_properties(
+  introspection_fortran_tests.F
+  PROPERTIES
+  Fortran_FORMAT FREE)
 
 blt_add_test(
   NAME introspection_fortran_tests
@@ -105,17 +84,10 @@ blt_add_executable(
   DEFINES ${fortran_test_defines}
   DEPENDS_ON ${fortran_tests_depends})
 
-if (Fortran_COMPILER_FAMILY_IS_CLANG)
-  set_source_files_properties(
-    version_fortran_tests.F
-    PROPERTIES
-    COMPILE_FLAGS -Mfree)
-else()
-  set_source_files_properties(
-    version_fortran_tests.F
-    PROPERTIES
-    Fortran_FORMAT FREE)
-endif()
+set_source_files_properties(
+  version_fortran_tests.F
+  PROPERTIES
+  Fortran_FORMAT FREE)
 
 blt_add_test(
   NAME version_fortran_tests
@@ -127,17 +99,10 @@ blt_add_executable(
   DEFINES ${fortran_test_defines}
   DEPENDS_ON ${fortran_tests_depends})
 
-if (Fortran_COMPILER_FAMILY_IS_CLANG)
-  set_source_files_properties(
-    aligned_pool_fortran_tests.F
-    PROPERTIES
-    COMPILE_FLAGS -Mfree)
-else()
-  set_source_files_properties(
-    aligned_pool_fortran_tests.F
-    PROPERTIES
-    Fortran_FORMAT FREE)
-endif()
+set_source_files_properties(
+  aligned_pool_fortran_tests.F
+  PROPERTIES
+  Fortran_FORMAT FREE)
 
 blt_add_test(
   NAME aligned_pool_fortran_tests
