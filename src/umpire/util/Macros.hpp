@@ -19,56 +19,20 @@
 #define UMPIRE_ASSERT(condition) assert(condition)
 
 #ifdef UMPIRE_ENABLE_LOGGING
-#ifdef UMPIRE_ENABLE_SLIC
-#include <stdlib.h>  // for getenv()
-#include <strings.h> // for strcasecmp()
-
-#include <string>
-
-#include "slic/GenericOutputStream.hpp"
-#include "slic/Logger.hpp"
-#define UMPIRE_LOG(lvl, msg)                                                                            \
-  {                                                                                                     \
-    axom::slic::Logger* plog = axom::slic::Logger::getActiveLogger();                                   \
-    if (plog == nullptr) {                                                                              \
-      static const std::string env_name = "UMPIRE_LOG_LEVEL";                                           \
-      axom::slic::Logger::initialize();                                                                 \
-      plog = axom::slic::Logger::getActiveLogger();                                                     \
-      axom::slic::message::Level level;                                                                 \
-      level = axom::slic::message::Level::Error;                                                        \
-      char* enval = std::getenv(env_name.c_str());                                                      \
-      if (enval != NULL) {                                                                              \
-        for (int i = 0; i < axom::slic::message::Level::Num_Levels; ++i) {                              \
-          if (strcasecmp(enval, axom::slic::message::MessageLevelName[i].c_str()) == 0) {               \
-            level = (axom::slic::message::Level)i;                                                      \
-            break;                                                                                      \
-          }                                                                                             \
-        }                                                                                               \
-      }                                                                                                 \
-      plog->setLoggingMsgLevel(level);                                                                  \
-                                                                                                        \
-      std::string console_format = std::string("[<LEVEL>][<FILE>:<LINE>]: <MESSAGE>\n");                \
-      axom::slic::LogStream* console = new axom::slic::GenericOutputStream(&std::cerr, console_format); \
-      plog->addStreamToAllMsgLevels(console);                                                           \
-    }                                                                                                   \
-    std::ostringstream local_msg;                                                                       \
-    local_msg << " " << __func__ << " " << msg;                                                         \
-    plog->logMessage(axom::slic::message::lvl, local_msg.str(), std::string(__FILE__), __LINE__);       \
-  }
-
-#else
 
 #include "umpire/util/Logger.hpp"
-#define UMPIRE_LOG(lvl, msg)                                                                           \
-  {                                                                                                    \
-    if (umpire::util::Logger::getActiveLogger()->logLevelEnabled(umpire::util::message::lvl)) {        \
-      std::ostringstream local_msg;                                                                    \
-      local_msg << " " << __func__ << " " << msg;                                                      \
-      umpire::util::Logger::getActiveLogger()->logMessage(umpire::util::message::lvl, local_msg.str(), \
-                                                          std::string(__FILE__), __LINE__);            \
-    }                                                                                                  \
-  }
-#endif // UMPIRE_ENABLE_SLIC
+
+// __FILE__ is passed as a const char* (static storage duration) rather than
+// a std::string: asynchronous logging reads the filename from a background
+// thread after this macro has returned.
+#define UMPIRE_LOG(lvl, msg)                                                                              \
+  do {                                                                                                    \
+    if (umpire::util::Logger::shouldLog(umpire::util::message::lvl)) {                                    \
+      std::ostringstream umpire_log_stream;                                                               \
+      umpire_log_stream << " " << __func__ << " " << msg;                                                 \
+      umpire::util::Logger::log(umpire::util::message::lvl, umpire_log_stream.str(), __FILE__, __LINE__); \
+    }                                                                                                     \
+  } while (0)
 
 #else
 

@@ -14,5 +14,6 @@ Features
   features/backtrace
   features/file_output
   features/logging_and_replay
+  features/logging_configuration
   features/operations
   features/strategies

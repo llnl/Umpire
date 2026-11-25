@@ -38,15 +38,6 @@ blt_add_test(
   COMMAND allocation_map_tests)
 
 blt_add_executable(
-  NAME output_buffer_tests
-  SOURCES output_buffer_tests.cpp
-  DEPENDS_ON umpire gtest)
-
-blt_add_test(
-  NAME output_buffer_tests
-  COMMAND output_buffer_tests)
-
-blt_add_executable(
   NAME memory_map_tests
   SOURCES memory_map_tests.cpp
   DEPENDS_ON umpire gtest)
@@ -90,3 +81,14 @@ blt_add_executable(
 blt_add_test(
   NAME fixed_malloc_pool_tests
   COMMAND fixed_malloc_pool_tests)
+
+if (UMPIRE_ENABLE_LOGGING)
+  blt_add_executable(
+    NAME logger_tests
+    SOURCES logger_tests.cpp
+    DEPENDS_ON umpire gtest)
+
+  blt_add_test(
+    NAME logger_tests
+    COMMAND logger_tests)
+endif ()

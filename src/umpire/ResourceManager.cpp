@@ -64,12 +64,11 @@ ResourceManager::ResourceManager()
       m_id(0),
       m_mutex()
 {
+#if defined(UMPIRE_ENABLE_LOGGING)
+  util::Logger::initialize();
+#endif
+
   UMPIRE_LOG(Debug, "() entering");
-
-  const char* env_enable_log{std::getenv("UMPIRE_LOG_LEVEL")};
-  const bool enable_log{env_enable_log != nullptr};
-
-  util::initialize_io(enable_log);
 
   initialize();
 
@@ -91,6 +90,10 @@ ResourceManager::~ResourceManager()
 
     allocator.reset();
   }
+
+#if defined(UMPIRE_ENABLE_LOGGING)
+  util::Logger::finalize();
+#endif
 }
 
 void ResourceManager::initialize()
@@ -382,28 +385,24 @@ void ResourceManager::destroyAllocator(const std::string& name, bool free_alloca
   int id = strategy->getId();
 
   const std::string& strategy_name = strategy->getName();
-  const bool is_shared_resource =
-      (strategy_name == "SHARED") || (strategy_name.rfind("SHARED::", 0) == 0);
+  const bool is_shared_resource = (strategy_name == "SHARED") || (strategy_name.rfind("SHARED::", 0) == 0);
 
   if (isBuiltinAllocator(strategy) && !is_shared_resource) {
-    UMPIRE_ERROR(runtime_error,
-                 fmt::format("Cannot destroy builtin allocator \"{}\"", name));
+    UMPIRE_ERROR(runtime_error, fmt::format("Cannot destroy builtin allocator \"{}\"", name));
   }
 
   auto records = umpire::get_allocator_records(Allocator(strategy));
 
   if (isStrictDestructionMode()) {
     if (!records.empty() && !free_allocations) {
-      UMPIRE_ERROR(runtime_error,
-                   fmt::format("Allocator \"{}\" has {} active allocations. "
-                              "Use free_allocations=true or deallocate them first.",
-                              name, records.size()));
+      UMPIRE_ERROR(runtime_error, fmt::format("Allocator \"{}\" has {} active allocations. "
+                                              "Use free_allocations=true or deallocate them first.",
+                                              name, records.size()));
     }
   } else if (!free_allocations && !records.empty()) {
     UMPIRE_LOG(Warning, "Allocator \"" << name << "\" may have active allocations. "
-                        << "Destroying anyway (non-strict mode).");
+                                       << "Destroying anyway (non-strict mode).");
   }
-
 
   if (isStrictDestructionMode()) {
     std::vector<std::string> child_names;
@@ -416,18 +415,18 @@ void ResourceManager::destroyAllocator(const std::string& name, bool free_alloca
     if (!child_names.empty()) {
       std::string children_str;
       for (size_t i = 0; i < child_names.size(); ++i) {
-        if (i > 0) children_str += ", ";
+        if (i > 0)
+          children_str += ", ";
         children_str += child_names[i];
       }
 
-      UMPIRE_ERROR(runtime_error,
-                   fmt::format("Allocator \"{}\" is a parent of other allocators: {}. "
-                              "Destroy children first.",
-                              name, children_str));
+      UMPIRE_ERROR(runtime_error, fmt::format("Allocator \"{}\" is a parent of other allocators: {}. "
+                                              "Destroy children first.",
+                                              name, children_str));
     }
   } else {
     UMPIRE_LOG(Warning, "Allocator \"" << name << "\" may be a parent of other allocators. "
-                        << "Destroying anyway (non-strict mode).");
+                                       << "Destroying anyway (non-strict mode).");
   }
 
   if (free_allocations) {
@@ -444,7 +443,7 @@ void ResourceManager::destroyAllocator(const std::string& name, bool free_alloca
     // with a new allocator at the same address.
     //
     UMPIRE_LOG(Warning, "Untracking " << records.size() << " active allocations for allocator \"" << name
-                                     << "\" (allocator destroyed without freeing allocations).");
+                                      << "\" (allocator destroyed without freeing allocations).");
     for (const auto& record : records) {
       deregisterAllocation(record.ptr);
     }
