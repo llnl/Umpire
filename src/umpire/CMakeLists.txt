@@ -202,6 +202,7 @@ target_include_directories(
   umpire
   PUBLIC
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src>
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
   $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
@@ -220,4 +221,23 @@ install(FILES
   ${CMAKE_BINARY_DIR}/include/umpire/config.hpp
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/umpire)
 
+install(DIRECTORY
+  ${PROJECT_SOURCE_DIR}/include/umpire/
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/umpire
+  FILES_MATCHING
+  PATTERN "*.hpp"
+  PATTERN "*.h"
+  PATTERN "*.inl")
+
 umpire_add_code_checks(PREFIX umpire)
+
+if ("${PROJECT_SOURCE_DIR}" STREQUAL "${CMAKE_SOURCE_DIR}")
+  file(GLOB_RECURSE umpire_public_headers
+    "${PROJECT_SOURCE_DIR}/include/umpire/*.hpp"
+    "${PROJECT_SOURCE_DIR}/include/umpire/*.h"
+    "${PROJECT_SOURCE_DIR}/include/umpire/*.inl")
+  blt_add_code_checks(
+    PREFIX umpire_headers
+    SOURCES ${umpire_public_headers}
+    CLANGFORMAT_CFG_FILE ${PROJECT_SOURCE_DIR}/.clang-format)
+endif()

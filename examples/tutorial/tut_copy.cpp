@@ -6,6 +6,7 @@
 //////////////////////////////////////////////////////////////////////////////
 #include "umpire/Allocator.hpp"
 #include "umpire/ResourceManager.hpp"
+#include "umpire/op.hpp"
 
 void copy_data(double* source_data, std::size_t size, const std::string& destination)
 {
@@ -15,7 +16,7 @@ void copy_data(double* source_data, std::size_t size, const std::string& destina
   double* dest_data = static_cast<double*>(dest_allocator.allocate(size * sizeof(double)));
 
   // _sphinx_tag_tut_copy_start
-  rm.copy(dest_data, source_data);
+  umpire::copy(source_data, dest_data, size);
   // _sphinx_tag_tut_copy_end
 
   std::cout << "Copied source data (" << source_data << ") to destination " << destination << " (" << dest_data << ")"

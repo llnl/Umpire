@@ -18,6 +18,7 @@
 #include "camp/resource.hpp"
 #include "umpire/Allocator.hpp"
 #include "umpire/Tracking.hpp"
+#include "umpire/config.hpp"
 #include "umpire/resource/MemoryResourceTypes.hpp"
 #include "umpire/strategy/AllocationStrategy.hpp"
 #include "umpire/util/AllocationMap.hpp"
@@ -26,7 +27,7 @@ namespace umpire {
 
 namespace op {
 class MemoryOperation;
-}
+} // namespace op
 
 namespace strategy {
 class ZeroByteHandler;
@@ -261,9 +262,39 @@ class ResourceManager {
    * \param dst_ptr Destination pointer.
    * \param src_ptr Source pointer.
    * \param size Size in bytes.
+   *
+   * \deprecated Use the global umpire::copy(src, dst, size) function instead.
+   *
+   * \warning umpire::copy takes arguments in (src, dst, size) order, which is
+   *          the REVERSE of this method's (dst, src, size) order. A mechanical
+   *          migration that does not swap the pointer arguments will compile
+   *          cleanly but silently copy data in the wrong direction. In
+   *          addition, umpire::copy always copies exactly the size given
+   *          (a size of 0 copies nothing) -- it does not auto-detect the
+   *          full allocation size the way this method does when size == 0.
    */
+  [[deprecated(
+      "Use umpire::copy(src, dst, size) instead -- NOTE: argument order is REVERSED (src, dst) vs this method's (dst, "
+      "src)")]]
   void copy(void* dst_ptr, void* src_ptr, std::size_t size = 0);
 
+  /*!
+   * \brief Asynchronously copy size bytes of data from src_ptr to dst_ptr.
+   *
+   * \deprecated Use the global umpire::copy(src, dst, size, ctx) function instead.
+   *
+   * \warning umpire::copy takes arguments in (src, dst, size, ctx) order,
+   *          which is the REVERSE of this method's (dst, src, ctx, size)
+   *          order. A mechanical migration that does not swap the pointer
+   *          arguments will compile cleanly but silently copy data in the
+   *          wrong direction. In addition, umpire::copy always copies
+   *          exactly the size given (a size of 0 copies nothing) -- it does
+   *          not auto-detect the full allocation size the way this method
+   *          does when size == 0.
+   */
+  [[deprecated(
+      "Use umpire::copy(src, dst, size, ctx) instead -- NOTE: argument order is REVERSED (src, dst) vs this method's "
+      "(dst, src)")]]
   camp::resources::EventProxy<camp::resources::Resource> copy(void* dst_ptr, void* src_ptr,
                                                               camp::resources::Resource& ctx, std::size_t size = 0);
 
@@ -273,9 +304,17 @@ class ResourceManager {
    * \param ptr Pointer to data.
    * \param val Value to set.
    * \param length Number of bytes to set to val.
+   *
+   * \deprecated Use the global umpire::memset function instead.
    */
+  [[deprecated(
+      "Use the global umpire::memset function instead -- NOTE: typed (non-void*) overloads take length as an ELEMENT "
+      "COUNT, not bytes")]]
   void memset(void* ptr, int val, std::size_t length = 0);
 
+  [[deprecated(
+      "Use the global umpire::memset function with Resource instead -- NOTE: typed (non-void*) overloads take length "
+      "as an ELEMENT COUNT, not bytes")]]
   camp::resources::EventProxy<camp::resources::Resource> memset(void* ptr, int val, camp::resources::Resource& ctx,
                                                                 std::size_t length = 0);
 
@@ -300,9 +339,16 @@ class ResourceManager {
    *
    * \return Reallocated pointer.
    *
+   * \deprecated Use the global umpire::reallocate function instead.
    */
+  [[deprecated(
+      "Use the global umpire::reallocate function instead -- NOTE: typed (non-void*) overloads take new_size as an "
+      "ELEMENT COUNT, not bytes")]]
   void* reallocate(void* current_ptr, std::size_t new_size);
 
+  [[deprecated(
+      "Use the global umpire::reallocate function with Resource instead -- NOTE: typed (non-void*) overloads take "
+      "new_size as an ELEMENT COUNT, not bytes")]]
   void* reallocate(void* current_ptr, std::size_t new_size, camp::resources::Resource& ctx);
 
   /*!
@@ -320,9 +366,20 @@ class ResourceManager {
    *
    * \return Reallocated pointer.
    *
+   * \deprecated No Allocator-taking replacement exists yet; umpire::reallocate
+   *             uses the allocation's existing allocator (or the default
+   *             allocator when *ptr is null).
    */
+  [[deprecated(
+      "No Allocator-taking replacement exists yet: umpire::reallocate uses the allocation's existing allocator (or the "
+      "DEFAULT allocator when *ptr is null) -- NOTE: typed (non-void*) overloads take new_size as an ELEMENT COUNT, "
+      "not bytes")]]
   void* reallocate(void* current_ptr, std::size_t new_size, Allocator allocator);
 
+  [[deprecated(
+      "No Allocator-taking replacement exists yet: umpire::reallocate with Resource uses the allocation's existing "
+      "allocator (or the DEFAULT allocator when *ptr is null) -- NOTE: typed (non-void*) overloads take new_size as an "
+      "ELEMENT COUNT, not bytes")]]
   void* reallocate(void* current_ptr, std::size_t new_size, Allocator allocator, camp::resources::Resource& ctx);
 
   /*!
@@ -332,6 +389,9 @@ class ResourceManager {
    * \param allocator Allocator to use to allocate new memory for moved data.
    *
    * \return Pointer to new location of data.
+   *
+   * \note No umpire::move free-function replacement exists yet (planned
+   *       follow-up). This method remains supported and is NOT deprecated.
    */
   void* move(void* src_ptr, Allocator allocator);
 
@@ -348,7 +408,12 @@ class ResourceManager {
    * \param ptr Pointer to prefech
    * \param device Device to prefetch data to
    * \param ctx Resource to use for asynchronous operation
+   *
+   * \deprecated Use the global umpire::prefetch function instead.
    */
+  [[deprecated(
+      "Use the global umpire::prefetch function instead -- NOTE: it takes an explicit size, which for typed "
+      "(non-void*) pointers is an ELEMENT COUNT, not bytes")]]
   camp::resources::EventProxy<camp::resources::Resource> prefetch(void* ptr, int device,
                                                                   camp::resources::Resource& ctx);
 
