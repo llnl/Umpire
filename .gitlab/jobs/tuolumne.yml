@@ -20,7 +20,7 @@
 rocmcc_7_2_1_hip:
   variables:
     RADIUSS_SPACK_STACK: "rocm-7.2.1-cray-mpich-9.1.0"
-    SPEC: "${PROJECT_TUOLUMNE_VARIANTS} +rocm amdgpu_target=gfx942 ${PROJECT_TUOLUMNE_DEPS}"
+    SPEC: "${PROJECT_TUOLUMNE_VARIANTS} +rocm ${PROJECT_TUOLUMNE_DEPS}"
   extends: .job_on_tuolumne
   allow_failure: true
 
@@ -45,11 +45,11 @@ cce_21_0_0:
 rocmcc_6_4_3_hip_openmp_device_alloc:
   variables:
     RADIUSS_SPACK_STACK: "rocm-6.4.3-gcc-13.3.1-cray-mpich-9.0.1"
-    SPEC: "~shared +fortran +openmp +rocm +device_alloc tests=basic amdgpu_target=gfx942"
+    SPEC: "~shared +fortran +openmp +rocm +device_alloc tests=basic"
   extends: .job_on_tuolumne
 
 rocmcc_6_4_3_hip_deviceconst:
   variables:
     RADIUSS_SPACK_STACK: "rocm-6.4.3-gcc-13.3.1-cray-mpich-9.0.1"
-    SPEC: "~shared +fortran +deviceconst +rocm tests=basic amdgpu_target=gfx942"
+    SPEC: "~shared +fortran +deviceconst +rocm tests=basic"
   extends: .job_on_tuolumne

@@ -21,7 +21,7 @@
 rocmcc_6_4_3_hip:
   variables:
     RADIUSS_SPACK_STACK: "rocm-6.4.3-gcc-13.3.1-mvapich2-2.3.7.gcc_13"
-    SPEC: "${PROJECT_CORONA_VARIANTS} +rocm amdgpu_target=gfx906 ${PROJECT_CORONA_DEPS}"
+    SPEC: "${PROJECT_CORONA_VARIANTS} +rocm ${PROJECT_CORONA_DEPS}"
     MODULE_LIST: "rocm/6.4.3"
   extends: .job_on_corona
 
@@ -39,6 +39,6 @@ rocmcc_6_4_3_hip:
 rocmcc_5_7_1_hip_openmp_device_alloc:
   variables:
     RADIUSS_SPACK_STACK: "rocm-5.7.1-gcc-13.3.1-mvapich2-2.3.7.gcc_13"
-    SPEC: "~shared +fortran +openmp +device_alloc tests=basic +rocm amdgpu_target=gfx906"
+    SPEC: "~shared +fortran +openmp +device_alloc tests=basic +rocm"
   extends: .job_on_corona
 
