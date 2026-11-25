@@ -17,6 +17,15 @@
 #include "umpire/util/Platform.hpp"
 #include "umpire/util/error.hpp"
 
+// O_LARGEFILE and ftruncate64 are Linux-specific; on other POSIX systems
+// (e.g. macOS) off_t is 64-bit and plain ftruncate handles large files.
+#if !defined(O_LARGEFILE)
+#define O_LARGEFILE 0
+#endif
+#if !defined(__linux__)
+#define ftruncate64 ftruncate
+#endif
+
 #if defined(UMPIRE_ENABLE_UMAP)
 #include "umap/umap.h"
 #endif

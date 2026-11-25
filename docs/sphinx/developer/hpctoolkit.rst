@@ -159,7 +159,7 @@ Hatchet and get started with some analysis. Below is a Python3 interpreter mode 
 
 This example was set up to analyze the performance of the ``no-op_stress_test.cpp`` benchmark file
 from the Umpire repo. It compares the performance from one part of the program (i.e., the part that 
-measure the performance when doing deallocations in the "same order" as they were allocated) versus 
+measures the performance when doing deallocations in the "same order" as they were allocated) versus
 another part of the same program (i.e., the part that measures the performance when doing deallocations
 in the "reverse order" as they were allocated). 
 

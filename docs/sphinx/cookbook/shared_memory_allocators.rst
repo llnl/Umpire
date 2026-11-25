@@ -132,7 +132,7 @@ Note that this example could be easily adapted to the MPI3 Shared Memory type if
 .. literalinclude:: ../../../examples/cookbook/recipe_shared_memory.cpp
    :language: cpp
 
-The following example shows how to create, use, and verify the MPI3 Shared Memory Allocator. Note that although a name is needed when
+The following example shows how to create, use, and verify the MPI3 Shared Memory Allocator. Note that although a name is needed
 when creating the MPI3 Shared Memory allocator, a name is not needed when allocating memory.
 
 .. literalinclude:: ../../../examples/mpi3_shared_memory.cpp

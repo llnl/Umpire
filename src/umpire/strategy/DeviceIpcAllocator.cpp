@@ -115,7 +115,13 @@ void DeviceIpcAllocator::setup_shared_scope(MemoryResourceTraits::shared_scope s
     m_scope_color = props.pciDomainID * 1000000 + props.pciBusID * 1000 + props.pciDeviceID;
 
     UMPIRE_LOG(Debug, fmt::format("Socket scope: using color {} for PCI split", m_scope_color));
-    MPI_Comm_split(MPI_COMM_WORLD, m_scope_color, 0, &m_scope_comm);
+
+    //MPI_Comm_split(MPI_COMM_WORLD, m_scope_color, 0, &m_scope_comm);
+    MPI_Comm node_comm;
+    MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL, &node_comm);
+    MPI_Comm_split(node_comm, m_scope_color, 0, &m_scope_comm);
+    MPI_Comm_free(&node_comm);
+
     MPI_Comm_rank(m_scope_comm, &m_scope_rank);
     UMPIRE_LOG(Debug, fmt::format("Socket scope: rank {} in socket communicator", m_scope_rank));
   } else {
