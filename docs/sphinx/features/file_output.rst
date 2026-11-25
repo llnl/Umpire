@@ -20,9 +20,14 @@ output is written:
 The values of these variables are used to construct unique filenames for
 output. The extension ``.log`` is used for logging output, and ``.stats`` for
 replay output. The filenames additionally contain the process ID and a unique
-integer that is used to make multiple files with the same basename.
-This ensures that multiple runs with the same IO configuration do not
-overwrite files.
+integer that is used to make multiple files with the same basename. This
+ensures that multiple runs with the same IO configuration do not overwrite
+files.
+
+Replay ``.stats`` files use the replay-v2 JSONL format: one header record
+followed by ``make_allocator``, ``allocate``, and ``deallocate`` command
+records, each with ``pending`` and ``committed`` lifecycle states when the
+operation succeeds.
 
 The format of the filenames is:
 

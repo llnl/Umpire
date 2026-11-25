@@ -28,8 +28,12 @@ set (umpire_headers
   TypedAllocator.inl
   Umpire.hpp)
 
+set (umpire_replay_headers
+  replay/Replay.hpp)
+
 set (umpire_sources
   Allocator.cpp
+  Replay.cpp
   ResourceManager.cpp
   Umpire.cpp)
 
@@ -137,7 +141,7 @@ endif ()
 
 blt_add_library(
   NAME umpire
-  HEADERS ${umpire_headers}
+  HEADERS ${umpire_headers} ${umpire_replay_headers}
   SOURCES ${umpire_sources}
   DEPENDS_ON ${umpire_depends}
   DEFINES ${umpire_defines})
@@ -215,6 +219,10 @@ install(TARGETS
 install(FILES
   ${umpire_headers}
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/umpire)
+
+install(FILES
+  ${umpire_replay_headers}
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/umpire/replay)
 
 install(FILES
   ${CMAKE_BINARY_DIR}/include/umpire/config.hpp

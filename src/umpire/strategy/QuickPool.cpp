@@ -347,15 +347,20 @@ void QuickPool::do_coalesce(std::size_t suggested_size) noexcept
 
 PoolCoalesceHeuristic<QuickPool> QuickPool::blocks_releasable(std::size_t nblocks)
 {
-  return
-      [=](const strategy::QuickPool& pool) { return pool.getReleasableBlocks() >= nblocks ? pool.getActualSize() : 0; };
+  return PoolCoalesceHeuristic<QuickPool>::known(
+      [=](const strategy::QuickPool& pool) { return pool.getReleasableBlocks() >= nblocks ? pool.getActualSize() : 0; },
+      PoolCoalesceHeuristic<QuickPool>::Kind::blocks_releasable,
+      nblocks);
 }
 
 PoolCoalesceHeuristic<QuickPool> QuickPool::blocks_releasable_hwm(std::size_t nblocks)
 {
-  return [=](const strategy::QuickPool& pool) {
-    return pool.getReleasableBlocks() >= nblocks ? pool.getAlignedHighwaterMark() : 0;
-  };
+  return PoolCoalesceHeuristic<QuickPool>::known(
+      [=](const strategy::QuickPool& pool) {
+        return pool.getReleasableBlocks() >= nblocks ? pool.getAlignedHighwaterMark() : 0;
+      },
+      PoolCoalesceHeuristic<QuickPool>::Kind::blocks_releasable_hwm,
+      nblocks);
 }
 
 PoolCoalesceHeuristic<QuickPool> QuickPool::percent_releasable(int percentage)
@@ -365,18 +370,27 @@ PoolCoalesceHeuristic<QuickPool> QuickPool::percent_releasable(int percentage)
                  fmt::format("Invalid percentage: {}, percentage must be an integer between 0 and 100", percentage));
   }
   if (percentage == 0) {
-    return [=](const QuickPool& UMPIRE_UNUSED_ARG(pool)) { return 0; };
+    return PoolCoalesceHeuristic<QuickPool>::known(
+        [=](const QuickPool& UMPIRE_UNUSED_ARG(pool)) { return 0; },
+        PoolCoalesceHeuristic<QuickPool>::Kind::percent_releasable,
+        percentage);
   } else if (percentage == 100) {
-    return [=](const strategy::QuickPool& pool) {
-      return pool.getActualSize() == pool.getReleasableSize() ? pool.getActualSize() : 0;
-    };
+    return PoolCoalesceHeuristic<QuickPool>::known(
+        [=](const strategy::QuickPool& pool) {
+          return pool.getActualSize() == pool.getReleasableSize() ? pool.getActualSize() : 0;
+        },
+        PoolCoalesceHeuristic<QuickPool>::Kind::percent_releasable,
+        percentage);
   } else {
     float f = (float)((float)percentage / (float)100.0);
-    return [=](const strategy::QuickPool& pool) {
-      // Calculate threshold in bytes from the percentage
-      const std::size_t threshold = static_cast<std::size_t>(f * pool.getActualSize());
-      return pool.getReleasableSize() >= threshold ? pool.getActualSize() : 0;
-    };
+    return PoolCoalesceHeuristic<QuickPool>::known(
+        [=](const strategy::QuickPool& pool) {
+          // Calculate threshold in bytes from the percentage
+          const std::size_t threshold = static_cast<std::size_t>(f * pool.getActualSize());
+          return pool.getReleasableSize() >= threshold ? pool.getActualSize() : 0;
+        },
+        PoolCoalesceHeuristic<QuickPool>::Kind::percent_releasable,
+        percentage);
   }
 }
 
@@ -387,18 +401,27 @@ PoolCoalesceHeuristic<QuickPool> QuickPool::percent_releasable_hwm(int percentag
                  fmt::format("Invalid percentage: {}, percentage must be an integer between 0 and 100", percentage));
   }
   if (percentage == 0) {
-    return [=](const QuickPool& UMPIRE_UNUSED_ARG(pool)) { return 0; };
+    return PoolCoalesceHeuristic<QuickPool>::known(
+        [=](const QuickPool& UMPIRE_UNUSED_ARG(pool)) { return 0; },
+        PoolCoalesceHeuristic<QuickPool>::Kind::percent_releasable_hwm,
+        percentage);
   } else if (percentage == 100) {
-    return [=](const strategy::QuickPool& pool) {
-      return pool.getActualSize() == pool.getReleasableSize() ? pool.getAlignedHighwaterMark() : 0;
-    };
+    return PoolCoalesceHeuristic<QuickPool>::known(
+        [=](const strategy::QuickPool& pool) {
+          return pool.getActualSize() == pool.getReleasableSize() ? pool.getAlignedHighwaterMark() : 0;
+        },
+        PoolCoalesceHeuristic<QuickPool>::Kind::percent_releasable_hwm,
+        percentage);
   } else {
     float f = (float)((float)percentage / (float)100.0);
-    return [=](const strategy::QuickPool& pool) {
-      // Calculate threshold in bytes from the percentage
-      const std::size_t threshold = static_cast<std::size_t>(f * pool.getActualSize());
-      return pool.getReleasableSize() >= threshold ? pool.getAlignedHighwaterMark() : 0;
-    };
+    return PoolCoalesceHeuristic<QuickPool>::known(
+        [=](const strategy::QuickPool& pool) {
+          // Calculate threshold in bytes from the percentage
+          const std::size_t threshold = static_cast<std::size_t>(f * pool.getActualSize());
+          return pool.getReleasableSize() >= threshold ? pool.getAlignedHighwaterMark() : 0;
+        },
+        PoolCoalesceHeuristic<QuickPool>::Kind::percent_releasable_hwm,
+        percentage);
   }
 }
 

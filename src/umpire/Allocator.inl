@@ -9,8 +9,7 @@
 
 #include "umpire/Allocator.hpp"
 #include "umpire/config.hpp"
-#include "umpire/event/event.hpp"
-#include "umpire/event/recorder_factory.hpp"
+#include "umpire/event/operation_recording.hpp"
 #include "umpire/strategy/ThreadSafeAllocator.hpp"
 #include "umpire/util/Macros.hpp"
 #include "umpire/util/error.hpp"
@@ -19,32 +18,31 @@ namespace umpire {
 
 inline void* Allocator::do_allocate(std::size_t bytes)
 {
-  void* ret = nullptr;
-
   UMPIRE_ASSERT(UMPIRE_VERSION_OK());
 
   UMPIRE_LOG(Debug, "(" << bytes << ")");
 
-  if (0 == bytes) {
-    ret = allocateNull();
-  } else {
-    try {
-      ret = m_allocator->allocate(bytes);
-    } catch (umpire::out_of_memory_error& e) {
-      e.set_allocator_id(this->getId());
-      e.set_requested_size(bytes);
-      throw;
+  return umpire::event::record_allocate(m_allocator, bytes, [&]() -> void* {
+    void* ret = nullptr;
+
+    if (0 == bytes) {
+      ret = allocateNull();
+    } else {
+      try {
+        ret = m_allocator->allocate(bytes);
+      } catch (umpire::out_of_memory_error& e) {
+        e.set_allocator_id(this->getId());
+        e.set_requested_size(bytes);
+        throw;
+      }
     }
-  }
 
-  if (m_tracking) {
-    registerAllocation(ret, bytes, m_allocator);
-  }
+    if (m_tracking) {
+      registerAllocation(ret, bytes, m_allocator);
+    }
 
-  umpire::event::record<umpire::event::allocate>(
-      [&](auto& event) { event.size(bytes).ref((void*)m_allocator).ptr(ret); });
-
-  return ret;
+    return ret;
+  });
 }
 
 inline void* Allocator::thread_safe_allocate(std::size_t bytes)
@@ -79,95 +77,94 @@ inline void Allocator::thread_safe_resource_deallocate(void* ptr, camp::resource
 
 inline void* Allocator::do_named_allocate(const std::string& name, std::size_t bytes)
 {
-  void* ret = nullptr;
-
   UMPIRE_ASSERT(UMPIRE_VERSION_OK());
 
   UMPIRE_LOG(Debug, "(" << bytes << ")");
 
-  if (0 == bytes) {
-    ret = allocateNull();
-  } else {
-    ret = m_allocator->allocate_named(name, bytes);
-  }
+  return umpire::event::record_named_allocate(m_allocator, name, bytes, [&]() -> void* {
+    void* ret = nullptr;
 
-  if (m_tracking) {
-    registerAllocation(ret, bytes, m_allocator, name);
-  }
+    if (0 == bytes) {
+      ret = allocateNull();
+    } else {
+      ret = m_allocator->allocate_named(name, bytes);
+    }
 
-  umpire::event::record<umpire::event::named_allocate>(
-      [&](auto& event) { event.name(name).size(bytes).ref((void*)m_allocator).ptr(ret); });
-  return ret;
+    if (m_tracking) {
+      registerAllocation(ret, bytes, m_allocator, name);
+    }
+
+    return ret;
+  });
 }
 
 inline void* Allocator::do_resource_allocate(std::size_t bytes, camp::resources::Resource const& r)
 {
-  void* ret = nullptr;
-
   UMPIRE_ASSERT(UMPIRE_VERSION_OK());
 
   UMPIRE_LOG(Debug, "(" << bytes << ")");
 
-  if (0 == bytes) {
-    ret = allocateNull();
-  } else {
-    ret = m_allocator->allocate_resource(bytes, r);
-  }
+  return umpire::event::record_resource_allocate(m_allocator, bytes, r, [&]() -> void* {
+    void* ret = nullptr;
 
-  if (m_tracking) {
-    registerAllocation(ret, bytes, m_allocator);
-  }
+    if (0 == bytes) {
+      ret = allocateNull();
+    } else {
+      ret = m_allocator->allocate_resource(bytes, r);
+    }
 
-  umpire::event::record<umpire::event::allocate_resource>(
-      [&](auto& event) { event.size(bytes).ref((void*)m_allocator).ptr(ret).res(camp::resources::to_string(r)); });
-  return ret;
+    if (m_tracking) {
+      registerAllocation(ret, bytes, m_allocator);
+    }
+
+    return ret;
+  });
 }
 
 inline void Allocator::do_deallocate(void* ptr)
 {
-  umpire::event::record<umpire::event::deallocate>([&](auto& event) { event.ref((void*)m_allocator).ptr(ptr); });
-
   UMPIRE_LOG(Debug, "(" << ptr << ")");
 
-  if (!ptr) {
-    UMPIRE_LOG(Info, "Deallocating a null pointer (This behavior is intentionally allowed and ignored)");
-    return;
-  } else {
-    if (m_tracking) {
-      auto record = deregisterAllocation(ptr, m_allocator);
-      if (!deallocateNull(ptr)) {
-        m_allocator->deallocate(ptr, record.size);
-      }
+  umpire::event::record_deallocate(m_allocator, ptr, [&]() {
+    if (!ptr) {
+      UMPIRE_LOG(Info, "Deallocating a null pointer (This behavior is intentionally allowed and ignored)");
+      return;
     } else {
-      if (!deallocateNull(ptr)) {
-        m_allocator->deallocate(ptr);
+      if (m_tracking) {
+        auto record = deregisterAllocation(ptr, m_allocator);
+        if (!deallocateNull(ptr)) {
+          m_allocator->deallocate(ptr, record.size);
+        }
+      } else {
+        if (!deallocateNull(ptr)) {
+          m_allocator->deallocate(ptr);
+        }
       }
     }
-  }
+  });
 }
 
 inline void Allocator::do_resource_deallocate(void* ptr, camp::resources::Resource const& r)
 {
-  umpire::event::record<umpire::event::deallocate_resource>(
-      [&](auto& event) { event.ref((void*)m_allocator).ptr(ptr).res(camp::resources::to_string(r)); });
-
   UMPIRE_LOG(Debug, "(" << ptr << ")");
 
-  if (!ptr) {
-    UMPIRE_LOG(Info, "Deallocating a null pointer (This behavior is intentionally allowed and ignored)");
-    return;
-  } else {
-    if (m_tracking) {
-      auto record = deregisterAllocation(ptr, m_allocator);
-      if (!deallocateNull(ptr)) {
-        m_allocator->deallocate_resource(ptr, r, record.size);
-      }
+  umpire::event::record_resource_deallocate(m_allocator, ptr, r, [&]() {
+    if (!ptr) {
+      UMPIRE_LOG(Info, "Deallocating a null pointer (This behavior is intentionally allowed and ignored)");
+      return;
     } else {
-      if (!deallocateNull(ptr)) {
-        m_allocator->deallocate_resource(ptr, r);
+      if (m_tracking) {
+        auto record = deregisterAllocation(ptr, m_allocator);
+        if (!deallocateNull(ptr)) {
+          m_allocator->deallocate_resource(ptr, r, record.size);
+        }
+      } else {
+        if (!deallocateNull(ptr)) {
+          m_allocator->deallocate_resource(ptr, r);
+        }
       }
     }
-  }
+  });
 }
 
 inline void* Allocator::allocate(std::size_t bytes)

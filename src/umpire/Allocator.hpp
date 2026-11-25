@@ -172,6 +172,7 @@ class Allocator : private strategy::mixins::Inspector, strategy::mixins::Allocat
    * \return Pointer to the AllocationStrategy.
    */
   strategy::AllocationStrategy* getAllocationStrategy() noexcept;
+  strategy::AllocationStrategy* getAllocationStrategy() const noexcept;
 
   /*!
    * \brief Get the Platform object appropriate for this Allocator.

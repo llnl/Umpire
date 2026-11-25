@@ -87,6 +87,12 @@ strategy::AllocationStrategy* Allocator::getAllocationStrategy() noexcept
   return m_allocator;
 }
 
+strategy::AllocationStrategy* Allocator::getAllocationStrategy() const noexcept
+{
+  UMPIRE_LOG(Debug, "() returning " << m_allocator);
+  return m_allocator;
+}
+
 Platform Allocator::getPlatform() noexcept
 {
   return m_allocator->getPlatform();
