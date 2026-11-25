@@ -19,7 +19,8 @@
 
 clang_18_1_8_gcc_13_cuda_12_6_0:
   variables:
-    SPEC: "${PROJECT_MATRIX_VARIANTS} +deviceconst %clang-18-gcc-13 ^cmake@3.25.2 ^cuda@12.6.0+allow-unsupported-compilers ${PROJECT_MATRIX_DEPS}"
+    RADIUSS_SPACK_STACK: "clang-18.1.8-gcc-13.3.1-mvapich2-2.3.7.gcc_13-cuda-12.6.0"
+    SPEC: "${PROJECT_MATRIX_VARIANTS} +deviceconst ^cmake@3.25.2 ${PROJECT_MATRIX_DEPS}"
   extends: .job_on_matrix
 
 ############

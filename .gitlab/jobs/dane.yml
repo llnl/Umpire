@@ -26,31 +26,37 @@
 
 gcc_11_2_1_numa:
   variables:
-    SPEC: "~shared +fortran +numa +tools tests=basic %gcc@=11.2.1"
+    RADIUSS_SPACK_STACK: "gcc-11.2.1-mvapich2-2.3.7"
+    SPEC: "~shared +fortran +numa +tools tests=basic"
   extends: .job_on_dane
 
 clang_14_0_6_gcc_11_2_1_sqlite_experimental:
   variables:
-    SPEC: "~shared +sqlite_experimental +tools tests=basic %clang-14-gcc-11"
+    RADIUSS_SPACK_STACK: "clang-14.0.6-gcc-11.2.1-mvapich2-2.3.7.clang_14"
+    SPEC: "~shared +sqlite_experimental +tools tests=basic"
   extends: .job_on_dane
 
 # Develop builds against specific tpl version.
 clang_14_0_6_gcc_11_2_1_tpls:
   variables:
-    SPEC: "~shared +fortran +tools tests=basic %clang-14-gcc-11"
+    RADIUSS_SPACK_STACK: "clang-14.0.6-gcc-11.2.1-mvapich2-2.3.7.clang_14"
+    SPEC: "~shared +fortran +tools tests=basic"
   extends: .job_on_dane
 
 gcc_11_2_1_tpls:
   variables:
-    SPEC: "~shared +fortran +tools tests=basic %gcc@=11.2.1"
+    RADIUSS_SPACK_STACK: "gcc-11.2.1-mvapich2-2.3.7"
+    SPEC: "~shared +fortran +tools tests=basic"
   extends: .job_on_dane
 
 gcc_11_2_1_ipc_no_mpi:
   variables:
-    SPEC: "~shared +ipc_shmem tests=basic %gcc@=11.2.1"
+    RADIUSS_SPACK_STACK: "gcc-11.2.1-mvapich2-2.3.7"
+    SPEC: "~shared +ipc_shmem tests=basic"
   extends: .job_on_dane
 
 gcc_10_3_1_mpi3_and_ipc_shmem:
   variables:
-    SPEC: "~shared +mpi3_shmem +ipc_shmem +mpi tests=basic %gcc@=10.3.1 ^mvapich2"
+    RADIUSS_SPACK_STACK: "gcc-10.3.1-mvapich2-2.3.7"
+    SPEC: "~shared +mpi3_shmem +ipc_shmem +mpi tests=basic ^mvapich2"
   extends: .job_on_dane
